@@ -42,15 +42,15 @@
   transform: rotateY(180deg);
 }
 
-/* Animated sprites are small; show them at natural size, never stretched. */
+/* Animated sprites are small pixel art: scale them up to fill the card
+   (aspect ratio kept) with hard pixel edges instead of blur. */
 .flip-back img {
   display: block;
-  max-width: 90%;
-  max-height: 90%;
-  width: auto;
-  height: auto;
-  padding: 0;
+  width: 100%;
+  height: 100%;
+  padding: 14%;
   object-fit: contain;
+  image-rendering: pixelated;
 }
 
 .flip-hint {
