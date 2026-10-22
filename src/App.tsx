@@ -137,9 +137,6 @@ export function GenerationSection({
           className="exp-bar"
           style={{ "--fill": `${ids.length ? (solved / ids.length) * 100 : 0}%` } as CSSProperties}
         >
-          <span className="exp-tag" aria-hidden="true">
-            EXP
-          </span>
           <h2 id={headingId}>
             {group.title}
             {group.region && <span className="region"> · {group.region}</span>}

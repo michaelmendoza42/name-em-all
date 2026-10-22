@@ -223,13 +223,13 @@ main {
 /* Gen 3 (Ruby/Sapphire/Emerald) battle box whose body is the EXP bar.
    Fixed palette in both themes: it's a sprite, not UI chrome. */
 .exp-bar {
-  --gba-ink: #404040;
-  --gba-ink-shadow: #d8d0b0;
-  --gba-frame: #384850;
-  --gba-panel: #f8f8d8;
-  --gba-exp: #40c8f8;
-  --gba-exp-hi: #a8f0f8;
-  --gba-exp-lo: #2890c0;
+  --gba-ink: #3c4246;
+  --gba-ink-shadow: #dcd8c4;
+  --gba-frame: #4a565e;
+  --gba-panel: #f2f0e2;
+  --gba-exp: #8cc0d4;
+  --gba-exp-hi: #bcdae4;
+  --gba-exp-lo: #6a9db2;
   position: relative;
   isolation: isolate;
   display: flex;
@@ -237,7 +237,7 @@ main {
   gap: 10px;
   padding: 7px 12px 6px;
   overflow: hidden;
-  font-family: "Pixelify Sans", ui-monospace, monospace;
+  font-family: "VT323", ui-monospace, monospace;
   color: var(--gba-ink);
   text-shadow: 1px 1px 0 var(--gba-ink-shadow);
   background: var(--gba-panel);
@@ -246,7 +246,7 @@ main {
   /* Inner bevel + chunky drop shadow, like the GBA box art. */
   box-shadow:
     inset 0 0 0 2px #ffffff,
-    inset 0 -3px 0 2px #e0d8b0,
+    inset 0 -3px 0 2px #e2dfcc,
     3px 3px 0 color-mix(in srgb, var(--gba-frame) 35%, transparent);
 }
 
@@ -266,22 +266,11 @@ main {
   transition: width 0.8s steps(16, end);
 }
 
-.exp-tag {
-  padding: 1px 5px 0;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #f8d030;
-  text-shadow: 1px 1px 0 #806000;
-  background: var(--gba-frame);
-  border-radius: 3px;
-}
-
 .generation-head h2 {
   margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
 }
 
 .generation-head .region {
@@ -290,7 +279,8 @@ main {
 
 .generation-count {
   margin: 0 0 0 auto;
-  font-size: 15px;
+  font-size: 22px;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
@@ -301,7 +291,7 @@ main {
 
 @keyframes exp-full {
   50% {
-    border-color: #f8d030;
+    border-color: #c8b06a;
   }
 }
 
