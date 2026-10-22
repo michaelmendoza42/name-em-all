@@ -170,6 +170,23 @@ input {
   font-weight: 600;
 }
 
+.credits {
+  padding: 24px var(--gutter) 32px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.credits p {
+  max-width: 60em;
+  margin: 0 auto 4px;
+}
+
+.credits a {
+  color: inherit;
+}
+
 /* Wall */
 
 main {

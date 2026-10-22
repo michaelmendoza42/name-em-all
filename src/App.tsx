@@ -64,6 +64,16 @@ export function App({ store }: { store: ProgressStore }) {
         )}
         {load.state === "ready" && <Wall store={store} data={load.data} />}
       </main>
+
+      <footer className="credits">
+        <p>
+          Pokémon and all Pokémon artwork © Nintendo / Creatures Inc. / GAME FREAK Inc. / The Pokémon Company.
+          This is an unofficial fan project and is not affiliated with or endorsed by them.
+        </p>
+        <p>
+          Data from <a href="https://pokeapi.co">PokéAPI</a>. Progress is saved only in this browser.
+        </p>
+      </footer>
     </>
   );
 }
