@@ -4,6 +4,7 @@ export interface Species {
   name: string; // official English name
   generation: number;
   types: readonly string[];
+  animated?: boolean; // has public/anim/<id>.gif for the solved-card flip
 }
 
 export interface Dataset {

@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render } from "@testing-library/react";
-import { GenerationSection } from "../App";
+import { GenerationSection, JumpToNext } from "../App";
+import { guessInputs } from "../components/Tile";
 import { buildAnswerIndex } from "../lib/answers";
 import { groupByGeneration } from "../lib/generations";
 import { ProgressStore } from "../lib/progress";
@@ -20,5 +21,49 @@ describe("GenerationSection", () => {
     expect(head().classList.contains("complete")).toBe(false);
     act(() => store.solve(last));
     expect(head().classList.contains("complete")).toBe(true);
+  });
+});
+
+describe("GenerationSection collapse", () => {
+  it("hides the generation's Pokémon and takes them out of keyboard order", () => {
+    const store = new ProgressStore(new MemoryStorage());
+    const { container, getByRole } = render(<GenerationSection group={gen1} store={store} answers={answers} />);
+    const toggle = getByRole("button", { expanded: true });
+    const wall = container.querySelector("ol")!;
+    expect(toggle.getAttribute("aria-controls")).toBe(wall.id);
+    act(() => toggle.click());
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(wall.hidden).toBe(true);
+    expect(guessInputs()).toHaveLength(0);
+    act(() => toggle.click());
+    expect(wall.hidden).toBe(false);
+    expect(guessInputs()).toHaveLength(gen1.species.length);
+  });
+});
+
+describe("JumpToNext", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("shows on scroll, hides 3s after scrolling stops or when an input is focused", () => {
+    vi.useFakeTimers();
+    const store = new ProgressStore(new MemoryStorage());
+    const { container } = render(
+      <>
+        <GenerationSection group={gen1} store={store} answers={answers} />
+        <JumpToNext />
+      </>,
+    );
+    const jump = container.querySelector(".jump")!;
+    expect(jump.classList.contains("shown")).toBe(false);
+    act(() => void window.dispatchEvent(new Event("scroll")));
+    expect(jump.classList.contains("shown")).toBe(true);
+    act(() => void vi.advanceTimersByTime(2900));
+    expect(jump.classList.contains("shown")).toBe(true);
+    act(() => void vi.advanceTimersByTime(200));
+    expect(jump.classList.contains("shown")).toBe(false);
+
+    act(() => void window.dispatchEvent(new Event("scroll")));
+    act(() => guessInputs()[0].focus());
+    expect(jump.classList.contains("shown")).toBe(false);
   });
 });

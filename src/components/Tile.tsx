@@ -15,6 +15,7 @@ import { normalizeAnswer, type AnswerIndex } from "../lib/answers";
 import { remainingPattern, revealableCount, revealedPrefix, visibleTypes } from "../lib/hints";
 import type { ProgressStore } from "../lib/progress";
 import { focusAndGlide } from "../lib/scroll";
+import { FlipArt } from "./FlipArt";
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -29,10 +30,17 @@ function useProgress(store: ProgressStore, id: number) {
   return useSyncExternalStore(subscribe, () => store.get(id));
 }
 
+// Every unsolved tile's name input in page order, skipping collapsed generations.
+export function guessInputs(): HTMLInputElement[] {
+  return Array.from(document.querySelectorAll<HTMLInputElement>("input[data-guess]")).filter(
+    (el) => !el.closest("[hidden]"),
+  );
+}
+
 // The next (or previous) unsolved tile's name input, so solving can continue
 // by keyboard. Look it up before solving: the solved tile's input unmounts.
 function adjacentGuess(from: HTMLInputElement, dir: 1 | -1): HTMLInputElement | undefined {
-  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>("input[data-guess]"));
+  const inputs = guessInputs();
   return inputs[inputs.indexOf(from) + dir];
 }
 
@@ -141,27 +149,31 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
   return (
     <li className={`tile${progress.solved ? " solved" : ""}${justSolved ? " just-solved" : ""}`}>
       <span className="dex">{number}</span>
-      <div className="art">
-        <img
-          src={`${BASE}${showArt ? "art" : "sil"}/${id}.webp`}
-          alt={progress.solved ? name : showArt ? `Artwork of ${label}` : `Silhouette of ${label}`}
-          width={256}
-          height={256}
-          loading="lazy"
-          decoding="async"
-          draggable={false}
-        />
-        {!progress.solved && typesShown.length > 0 && (
-          <div className="types overlay">
-            <span className="sr-only">Revealed types: </span>
-            {typesShown.map((t) => (
-              <span key={t} className={`type type-${t}`}>
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+      {progress.solved ? (
+        <FlipArt id={id} name={name} animated={species.animated === true} />
+      ) : (
+        <div className="art">
+          <img
+            src={`${BASE}${showArt ? "art" : "sil"}/${id}.webp`}
+            alt={showArt ? `Artwork of ${label}` : `Silhouette of ${label}`}
+            width={256}
+            height={256}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+          />
+          {typesShown.length > 0 && (
+            <div className="types overlay">
+              <span className="sr-only">Revealed types: </span>
+              {typesShown.map((t) => (
+                <span key={t} className={`type type-${t}`}>
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Solved and unsolved tiles share one two-row layout so every card is
           the same height: name or input, then types or hint buttons. */}

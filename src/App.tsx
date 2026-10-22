@@ -1,10 +1,22 @@
-import { type CSSProperties, type Ref, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type CSSProperties,
+  type Ref,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import { buildAnswerIndex, type AnswerIndex } from "./lib/answers";
 import { loadDataset, type Dataset } from "./lib/dataset";
 import { groupByGeneration, type GenerationGroup } from "./lib/generations";
 import { STORAGE_KEY, type ProgressStore } from "./lib/progress";
-import { Tile } from "./components/Tile";
+import { focusAndGlide, isGliding } from "./lib/scroll";
+import { guessInputs, Tile } from "./components/Tile";
 
 const DATA_URL = `${import.meta.env.BASE_URL}pokedex.json`;
 const fmt = new Intl.NumberFormat("en-US");
@@ -65,6 +77,7 @@ export function App({ store }: { store: ProgressStore }) {
         )}
         {load.state === "ready" && <Wall store={store} data={load.data} />}
       </main>
+      {load.state === "ready" && <JumpToNext />}
 
       <footer className="credits">
         <p>
@@ -128,9 +141,23 @@ export function GenerationSection({
     () => store.solvedCount(ids),
   );
   const headingId = `gen-${group.generation}`;
+  const wallId = `${headingId}-wall`;
   const complete = ids.length > 0 && solved === ids.length;
+  const [collapsed, setCollapsed] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Collapsing from partway down a long section would leave the view far
+  // below its header; pull the header back up under the top bar.
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    if (!collapsed || !section) return;
+    const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bar-h")) || 0;
+    const top = section.getBoundingClientRect().top;
+    if (top < barH) window.scrollBy(0, top - barH);
+  }, [collapsed]);
+
   return (
-    <section className="generation" aria-labelledby={headingId}>
+    <section className="generation" aria-labelledby={headingId} ref={sectionRef}>
       <header className={complete ? "generation-head complete" : "generation-head"}>
         {/* The header is a Gen 3 EXP bar: it fills as the generation is named. */}
         <div
@@ -138,8 +165,18 @@ export function GenerationSection({
           style={{ "--fill": `${ids.length ? (solved / ids.length) * 100 : 0}%` } as CSSProperties}
         >
           <h2 id={headingId}>
-            {group.title}
-            {group.region && <span className="region"> · {group.region}</span>}
+            {/* Covers the whole bar (see CSS), so the header toggles anywhere. */}
+            <button
+              type="button"
+              className="collapse-toggle"
+              aria-expanded={!collapsed}
+              aria-controls={wallId}
+              onClick={() => setCollapsed((c) => !c)}
+            >
+              <span className="chevron" aria-hidden="true" />
+              {group.title}
+              {group.region && <span className="region"> · {group.region}</span>}
+            </button>
           </h2>
           <p className="generation-count">
             {complete && <span aria-hidden="true">✓ </span>}
@@ -147,12 +184,95 @@ export function GenerationSection({
           </p>
         </div>
       </header>
-      <ol className="wall" start={ids[0]}>
+      <ol className="wall" id={wallId} start={ids[0]} hidden={collapsed}>
         {group.species.map((s) => (
           <Tile key={s.id} species={s} store={store} answers={answers} />
         ))}
       </ol>
     </section>
+  );
+}
+
+const JUMP_IDLE_MS = 3000;
+
+// The next unsolved name input: after the focused one, else the first one at
+// or below the top of the view. Wraps to the start of the Pokédex.
+function nextUnsolved(): HTMLInputElement | undefined {
+  const inputs = guessInputs();
+  const active = inputs.indexOf(document.activeElement as HTMLInputElement);
+  if (active >= 0) return inputs[active + 1] ?? (active > 0 ? inputs[0] : undefined);
+  const padTop = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+  return inputs.find((el) => (el.closest("li") ?? el).getBoundingClientRect().top >= padTop) ?? inputs[0];
+}
+
+// Floating "next unsolved" button. It fades in while the page scrolls and
+// fades out 3s after scrolling stops, or at once when a name input gains
+// focus or a tile is clicked, whichever comes first.
+export function JumpToNext() {
+  const [shown, setShown] = useState(false);
+  const timer = useRef(0);
+  const hovered = useRef(false);
+
+  const hide = useCallback(() => {
+    clearTimeout(timer.current);
+    setShown(false);
+  }, []);
+  const hideLater = useCallback(() => {
+    clearTimeout(timer.current);
+    if (!hovered.current) timer.current = window.setTimeout(hide, JUMP_IDLE_MS);
+  }, [hide]);
+
+  useEffect(() => {
+    // Focusing an input scrolls it into view; that scroll shouldn't bring the
+    // button straight back.
+    let quietUntil = 0;
+    const onScroll = () => {
+      if (isGliding() || performance.now() < quietUntil) return;
+      if (!document.querySelector("input[data-guess]")) return hide();
+      setShown(true);
+      hideLater();
+    };
+    const dismiss = () => {
+      quietUntil = performance.now() + 300;
+      hide();
+    };
+    const onFocusIn = (e: FocusEvent) => {
+      if (e.target instanceof HTMLInputElement) dismiss();
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      if ((e.target as Element).closest?.(".tile")) dismiss();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      clearTimeout(timer.current);
+      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [hide, hideLater]);
+
+  return (
+    <button
+      type="button"
+      className={shown ? "jump shown" : "jump"}
+      onClick={() => {
+        const next = nextUnsolved();
+        if (next) focusAndGlide(next);
+      }}
+      // Hold off the fade while the pointer is on the button.
+      onPointerEnter={() => {
+        hovered.current = true;
+        clearTimeout(timer.current);
+      }}
+      onPointerLeave={() => {
+        hovered.current = false;
+        hideLater();
+      }}
+    >
+      Next unsolved <span aria-hidden="true">↓</span>
+    </button>
   );
 }
 
@@ -169,6 +289,11 @@ export function Menu({ store }: { store: ProgressStore }) {
   const toggleRef = useRef<HTMLButtonElement>(null);
   const oathRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  // Once all 151 are in (sworn or earned), the oath has nothing left to do.
+  const kantoDone = useSyncExternalStore(
+    useCallback((l: () => void) => store.subscribeAll(l), [store]),
+    () => store.solvedCount(KANTO_IDS) === KANTO_IDS.length,
+  );
 
   const close = useCallback((refocus: boolean) => {
     setOpen(false);
@@ -230,9 +355,15 @@ export function Menu({ store }: { store: ProgressStore }) {
             </div>
           ) : (
             <>
-              <button type="button" className="menu-item" onClick={() => setConfirming("oath")} autoFocus>
-                Fill in the original 151…
-              </button>
+              {kantoDone ? (
+                <button type="button" className="menu-item" disabled>
+                  Original 151: sworn &amp; notarized ✓
+                </button>
+              ) : (
+                <button type="button" className="menu-item" onClick={() => setConfirming("oath")} autoFocus>
+                  Fill in the original 151…
+                </button>
+              )}
               <button type="button" className="menu-item" onClick={() => setConfirming("reset")}>
                 Reset progress…
               </button>
@@ -290,31 +421,22 @@ function KantoOath({
             </li>
             <li>
               <strong>Pokérap Provision.</strong> You can perform the Pokérap from memory, or at minimum the
-              part that goes "Electrode, Diglett, Nidoran, Mankey."
+              part that goes "Electrode, Diglett, Nidoran, Mankey!"
             </li>
             <li>
               <strong>Spelling Warranty.</strong> You warrant that You know Farfetch'd has an apostrophe and
               Mr. Mime has a period, and that You have never once spelled it "Pikachew."
             </li>
             <li>
-              <strong>MissingNo. Disclaimer.</strong> MissingNo. is not one of the 151. You agree not to bring it
-              up. You know what You did to your item count.
-            </li>
-            <li>
               <strong>Waiver of Glory.</strong> You waive the right to feel accomplished about Generation I.
-              The counter will go up anyway. The counter will know.
-            </li>
-            <li>
-              <strong>Jurisdiction.</strong> This affidavit is binding in all regions, including the Orange
-              Islands, which do so count.
+              The counter will go up anyway.
             </li>
           </ol>
         </div>
         <label className="oath-swear">
           <input type="checkbox" checked={sworn} onChange={(e) => setSworn(e.target.checked)} autoFocus />
           <span>
-            I do solemnly swear that I know the original 151, because I am a millennial and this is common
-            knowledge, duh.
+            I do solemnly swear that I know the original 151, because I am a millennial or close enough.
           </span>
         </label>
         <div className="confirm-actions">

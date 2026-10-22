@@ -61,6 +61,10 @@ describe("Menu", () => {
     expect(store.get(151).solved).toBe(true);
     expect(store.get(152).solved).toBe(false);
     expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    expect(screen.queryByRole("button", { name: /Fill in the original 151/ })).toBeNull();
+    const done = screen.getByRole("button", { name: /sworn & notarized/ }) as HTMLButtonElement;
+    expect(done.disabled).toBe(true);
   });
 
   it("declining the oath changes nothing", async () => {

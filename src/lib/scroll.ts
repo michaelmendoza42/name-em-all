@@ -6,10 +6,18 @@ const MIN_MS = 220;
 const MAX_MS = 900;
 
 let frame = 0;
+// When the last scripted scroll ran, so scroll listeners can tell a glide
+// apart from the user scrolling.
+let lastGlide = -Infinity;
 let cancelListeners: (() => void) | undefined;
 
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+// True during a glide and briefly after it (its final scroll event lands late).
+export function isGliding(): boolean {
+  return frame !== 0 || performance.now() - lastGlide < 150;
 }
 
 function stop() {
@@ -44,6 +52,7 @@ export function focusAndGlide(input: HTMLElement) {
   const delta = scrollDelta(input.closest("li") ?? input);
   if (!delta) return;
   stop();
+  lastGlide = performance.now();
   if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
     window.scrollBy(0, delta);
     return;
@@ -54,6 +63,7 @@ export function focusAndGlide(input: HTMLElement) {
   const step = (now: number) => {
     const t = Math.min(1, (now - start) / duration);
     window.scrollTo(0, from + delta * easeInOutCubic(t));
+    lastGlide = now;
     if (t < 1) frame = requestAnimationFrame(step);
     else stop();
   };
