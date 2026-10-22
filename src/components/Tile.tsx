@@ -14,6 +14,7 @@ import type { Species } from "../lib/dataset";
 import { normalizeAnswer, type AnswerIndex } from "../lib/answers";
 import { remainingPattern, revealableCount, revealedPrefix, visibleTypes } from "../lib/hints";
 import type { ProgressStore } from "../lib/progress";
+import { focusAndGlide } from "../lib/scroll";
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -91,7 +92,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
     const next = answers.isExtendable(id, full) ? undefined : adjacentGuess(input, 1);
     setJustSolved(true);
     store.solve(id);
-    if (next) next.focus();
+    if (next) focusAndGlide(next);
     else setHoldFocus(true);
   }
 
