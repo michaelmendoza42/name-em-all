@@ -1,0 +1,51 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Menu } from "../App";
+import { ProgressStore, STORAGE_KEY } from "../lib/progress";
+import { MemoryStorage } from "./fixtures";
+
+afterEach(cleanup);
+
+function setup() {
+  const storage = new MemoryStorage();
+  const store = new ProgressStore(storage);
+  store.solve(25);
+  render(<Menu store={store} />);
+  return { store, storage, user: userEvent.setup() };
+}
+
+describe("Menu", () => {
+  it("hides Reset until the menu is opened", async () => {
+    const { user } = setup();
+    expect(screen.queryByText(/Reset progress/)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    expect(screen.getByRole("button", { name: /Reset progress/ })).toBeTruthy();
+  });
+
+  it("requires confirmation, and Cancel keeps progress", async () => {
+    const { user, store } = setup();
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("button", { name: /Reset progress/ }));
+    expect(store.get(25).solved).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(store.get(25).solved).toBe(true);
+  });
+
+  it("Erase clears all saved progress and closes the menu", async () => {
+    const { user, store, storage } = setup();
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("button", { name: /Reset progress/ }));
+    await user.click(screen.getByRole("button", { name: "Erase" }));
+    expect(store.get(25).solved).toBe(false);
+    expect(storage.getItem(STORAGE_KEY)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Erase" })).toBeNull();
+  });
+
+  it("Escape closes the menu", async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByText(/Reset progress/)).toBeNull();
+  });
+});

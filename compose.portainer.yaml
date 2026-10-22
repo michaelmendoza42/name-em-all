@@ -1,0 +1,21 @@
+# Portainer stack (Stacks → Add stack → Web editor): paste this file as is.
+# Portainer runs the image built on this host rather than cloning and
+# building. Rebuild it after pulling changes:
+#   git archive HEAD | docker build --build-arg REVISION=$(git rev-parse HEAD) -t name-em-all:latest -
+# (builds the committed code only, never uncommitted edits)
+# then Portainer → the stack → Update the stack (leave "re-pull image" off).
+name: name-em-all
+
+services:
+  web:
+    image: name-em-all:latest
+    pull_policy: never
+    ports:
+      - "8091:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped

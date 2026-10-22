@@ -1,0 +1,75 @@
+# Gotta Name 'Em All (name-em-all)
+
+One continuous wall of every Pokémon species as a silhouette. Type a name under
+a silhouette and it reveals the moment the name matches (no Enter; wrong text
+has no effect). Tab jumps between unsolved boxes. Hints are free and unlimited.
+Progress is saved in this browser only (localStorage). No account, no backend.
+
+## Run
+
+```bash
+npm install
+npm run dev        # http://<host>:5196 (bound to 0.0.0.0)
+npm test           # vitest: answers, aliases, hints, persistence, dataset coverage, tile behavior
+npm run build      # typecheck + production build into dist/
+```
+
+`public/` already contains the generated dataset and images. To regenerate:
+
+```bash
+npm run data                  # fetch species from PokéAPI, build missing images
+npm run data -- --force-images
+```
+
+## Deploy (Docker + Portainer on mmdebian)
+
+Production is a static nginx image run as the Portainer stack `name-em-all` on
+host port 8091, published at `https://name-em-all.michaelmendoza.me` through
+Nginx Proxy Manager.
+
+```bash
+# Build from committed code only (tests must pass or the build fails):
+git archive HEAD | docker build --build-arg REVISION=$(git rev-parse HEAD) -t name-em-all:latest -
+```
+
+- **First time:** Portainer → Stacks → Add stack → Web editor, name it
+  `name-em-all`, paste `compose.portainer.yaml`, Deploy.
+- **Updates:** rebuild the image as above, then Portainer → the stack →
+  Update the stack (leave "re-pull image" off).
+- Player progress lives in each visitor's browser (localStorage), so redeploys
+  never touch it.
+
+## Data
+
+- **Species, names, types**: [PokéAPI](https://pokeapi.co) GraphQL, one query
+  (`scripts/build-data.mjs`). One entry per species (National Dex #1–#1025, generations 1–9),
+  using each species' default form for types and artwork. Forms,
+  Megas, regional variants and costumes are not separate tiles.
+- **Types** are the current-generation types (e.g. Clefairy is Fairy, Mr. Mime is Psychic/Fairy).
+- **Artwork**: PokeAPI/sprites official artwork, resized to 256×256 WebP (`public/art`).
+- **Silhouettes**: cut from the same artwork by keeping only its alpha channel
+  and painting it black (`public/sil`), so silhouette files contain no color or detail.
+- The build script fails if the species count differs from PokéAPI's reported
+  total, if numbering has gaps, or if any species lacks an English name or types.
+  The app re-checks completeness when it loads `pokedex.json` and shows an error
+  rather than a partial wall.
+
+## Answers
+
+`normalizeAnswer` lowercases, strips accents, maps ♀/♂ to f/m and removes
+everything except letters and digits, so `mr mime`, `Flabebe` and
+`farfetch'd` all match. Genuinely different names live in
+`src/lib/aliases.ts`, keyed by species slug. Any key that two species share
+(for example plain "Nidoran") is ambiguous and is accepted for neither. There is no fuzzy matching.
+
+## Progress storage
+
+Key `wtp-ultimate:progress`:
+
+```json
+{ "version": 1, "pokemon": { "25": { "solved": true, "artwork": false, "types": 1, "letters": 3 } } }
+```
+
+Keys are National Dex numbers. Malformed values are dropped or clamped.
+Unreadable or unknown-version saves are copied to `wtp-ultimate:progress:unreadable-backup`
+before the app starts fresh. If storage is unavailable, the game runs in memory and says so in the header.
