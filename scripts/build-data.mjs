@@ -4,6 +4,8 @@
 //   public/pokedex.json      species list (id, slug, English name, types)
 //   public/art/<id>.webp     full-color official artwork, resized
 //   public/sil/<id>.webp     solid black silhouette cut from the same artwork
+//   public/anim/<id>.gif     animated sprite (shown when a solved card flips),
+//                            where one exists
 //
 // Re-run with `npm run data`. Downloads are cached in scripts/.cache, so
 // re-runs only fetch what's missing. Pass --force-images to rebuild images.
@@ -16,9 +18,17 @@ import sharp from "sharp";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(ROOT, "public");
 const CACHE = path.join(ROOT, "scripts", ".cache", "artwork");
+const ANIM_CACHE = path.join(ROOT, "scripts", ".cache", "anim");
 const GRAPHQL = "https://graphql.pokeapi.co/v1beta2";
 const ARTWORK = (id) =>
   `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+const SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
+// Animated sprite sources, best first. Showdown covers the most species;
+// Black/White fills gaps (its sprites above #650 are fan-made Gen 5 style).
+const ANIM_SOURCES = [
+  { name: "showdown", url: (id) => `${SPRITES}/other/showdown/${id}.gif` },
+  { name: "black-white", url: (id) => `${SPRITES}/versions/generation-v/black-white/animated/${id}.gif` },
+];
 const IMAGE_SIZE = 256;
 const ENGLISH = 9;
 const FORCE_IMAGES = process.argv.includes("--force-images");
@@ -114,6 +124,29 @@ async function buildImages(entry) {
   await sharp(rgba, { raw: { width, height, channels: 4 } }).webp({ lossless: true }).toFile(silOut);
 }
 
+// Returns true when public/anim/<id>.gif exists (copied now or earlier).
+// GIFs ship as-is: re-encoding these small sprites as WebP made them larger
+// (lossy) or barely smaller (lossless) at a much slower build.
+async function buildAnimation(entry) {
+  const out = path.join(PUBLIC, "anim", `${entry.id}.gif`);
+  if (!FORCE_IMAGES && (await exists(out))) return true;
+  for (const source of ANIM_SOURCES) {
+    const file = path.join(ANIM_CACHE, `${source.name}-${entry.artworkId}.gif`);
+    let gif;
+    if (await exists(file)) gif = await readFile(file);
+    else {
+      const res = await fetch(source.url(entry.artworkId));
+      if (res.status === 404) continue;
+      if (!res.ok) throw new Error(`animation ${source.name} ${entry.artworkId}: HTTP ${res.status}`);
+      gif = Buffer.from(await res.arrayBuffer());
+      await writeFile(file, gif);
+    }
+    await writeFile(out, gif);
+    return true;
+  }
+  return false;
+}
+
 async function runPool(items, limit, worker) {
   let next = 0;
   let done = 0;
@@ -135,8 +168,9 @@ async function runPool(items, limit, worker) {
 }
 
 async function main() {
-  await Promise.all(["art", "sil"].map((d) => mkdir(path.join(PUBLIC, d), { recursive: true })));
+  await Promise.all(["art", "sil", "anim"].map((d) => mkdir(path.join(PUBLIC, d), { recursive: true })));
   await mkdir(CACHE, { recursive: true });
+  await mkdir(ANIM_CACHE, { recursive: true });
 
   console.log("Fetching species from PokéAPI…");
   const entries = toEntries(await fetchSpecies());
@@ -145,11 +179,26 @@ async function main() {
   const failures = await runPool(entries, 12, buildImages);
   if (failures.length) throw new Error(`Image build failed for ${failures.length} species:\n  ${failures.join("\n  ")}`);
 
+  const animFailures = await runPool(entries, 12, async (e) => {
+    e.animated = await buildAnimation(e);
+  });
+  if (animFailures.length) throw new Error(`Animation build failed:\n  ${animFailures.join("\n  ")}`);
+  const missing = entries.filter((e) => !e.animated).map((e) => e.id);
+  console.log(`  animated sprites: ${entries.length - missing.length}/${entries.length}`);
+  if (missing.length) console.log(`  no animation for #${missing.join(", #")}`);
+
   const dataset = {
     source: "PokéAPI (graphql.pokeapi.co) + PokeAPI/sprites official artwork",
     generatedAt: new Date().toISOString(),
     count: entries.length,
-    species: entries.map(({ id, slug, name, generation, types }) => ({ id, slug, name, generation, types })),
+    species: entries.map(({ id, slug, name, generation, types, animated }) => ({
+      id,
+      slug,
+      name,
+      generation,
+      types,
+      animated,
+    })),
   };
   await writeFile(path.join(PUBLIC, "pokedex.json"), JSON.stringify(dataset) + "\n");
   console.log(`Wrote public/pokedex.json (${dataset.count} species)`);
