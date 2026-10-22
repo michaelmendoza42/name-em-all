@@ -155,7 +155,8 @@ input {
 }
 
 .bar button,
-.status button {
+.status button,
+.oath button {
   min-height: 36px;
   padding: 0 12px;
   border: 1px solid var(--border);
@@ -214,30 +215,94 @@ main {
   position: sticky;
   top: var(--bar-h);
   z-index: 5;
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
   margin: 0 calc(-1 * var(--gutter)) 10px;
-  padding: 12px calc(var(--gutter) + 2px) 8px;
+  padding: 10px var(--gutter) 8px;
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
+}
+
+/* Gen 3 (Ruby/Sapphire/Emerald) battle box whose body is the EXP bar.
+   Fixed palette in both themes: it's a sprite, not UI chrome. */
+.exp-bar {
+  --gba-ink: #404040;
+  --gba-ink-shadow: #d8d0b0;
+  --gba-frame: #384850;
+  --gba-panel: #f8f8d8;
+  --gba-exp: #40c8f8;
+  --gba-exp-hi: #a8f0f8;
+  --gba-exp-lo: #2890c0;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px 6px;
+  overflow: hidden;
+  font-family: "Pixelify Sans", ui-monospace, monospace;
+  color: var(--gba-ink);
+  text-shadow: 1px 1px 0 var(--gba-ink-shadow);
+  background: var(--gba-panel);
+  border: 3px solid var(--gba-frame);
+  border-radius: 4px;
+  /* Inner bevel + chunky drop shadow, like the GBA box art. */
+  box-shadow:
+    inset 0 0 0 2px #ffffff,
+    inset 0 -3px 0 2px #e0d8b0,
+    3px 3px 0 color-mix(in srgb, var(--gba-frame) 35%, transparent);
+}
+
+/* The fill: blue with a light top stripe and a dark bottom one, growing
+   in pixel-sized steps like the in-game EXP gain. */
+.exp-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  width: var(--fill, 0%);
+  background: linear-gradient(
+    var(--gba-exp-hi) 0 4px,
+    var(--gba-exp) 4px calc(100% - 4px),
+    var(--gba-exp-lo) calc(100% - 4px)
+  );
+  transition: width 0.8s steps(16, end);
+}
+
+.exp-tag {
+  padding: 1px 5px 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f8d030;
+  text-shadow: 1px 1px 0 #806000;
+  background: var(--gba-frame);
+  border-radius: 3px;
 }
 
 .generation-head h2 {
   margin: 0;
-  font-size: 16px;
-  letter-spacing: -0.01em;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .generation-head .region {
-  font-weight: 500;
-  color: var(--muted);
+  font-weight: 400;
 }
 
 .generation-count {
   margin: 0 0 0 auto;
-  color: var(--muted);
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
+}
+
+/* Full bar: a quick level-up flash. */
+.generation-head.complete .exp-bar {
+  animation: exp-full 0.9s steps(2, jump-none) 3;
+}
+
+@keyframes exp-full {
+  50% {
+    border-color: #f8d030;
+  }
 }
 
 .wall {
@@ -488,4 +553,111 @@ main {
   .just-solved .art img {
     animation: none;
   }
+  .exp-bar::before {
+    transition: none;
+  }
+  .generation-head.complete .exp-bar {
+    animation: none;
+  }
+}
+
+/* Kanto oath: a mock terms-of-service dialog */
+
+.oath-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--gutter);
+  background: rgb(0 0 0 / 0.45);
+}
+
+.oath {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 2 * var(--gutter));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  padding: 20px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.3);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.oath-form {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.oath h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.oath-terms {
+  overflow-y: auto;
+  min-height: 120px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.oath-terms p {
+  margin: 0 0 10px;
+}
+
+.oath-terms ol {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.oath-terms li + li {
+  margin-top: 8px;
+}
+
+.oath-terms:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.oath-swear {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.oath-swear input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.oath button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.oath button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.oath .confirm-actions {
+  flex-wrap: wrap;
 }

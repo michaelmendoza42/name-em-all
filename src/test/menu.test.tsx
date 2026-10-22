@@ -48,4 +48,27 @@ describe("Menu", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByText(/Reset progress/)).toBeNull();
   });
+
+  it("the Kanto oath fills in Gen 1 only after swearing", async () => {
+    const { user, store } = setup();
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("button", { name: /original 151/ }));
+    const swear = screen.getByRole("button", { name: /Swear/ }) as HTMLButtonElement;
+    expect(swear.disabled).toBe(true);
+    await user.click(screen.getByRole("checkbox", { name: /solemnly swear/ }));
+    await user.click(swear);
+    expect(store.get(1).solved).toBe(true);
+    expect(store.get(151).solved).toBe(true);
+    expect(store.get(152).solved).toBe(false);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("declining the oath changes nothing", async () => {
+    const { user, store } = setup();
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("button", { name: /original 151/ }));
+    await user.click(screen.getByRole("button", { name: /decline/ }));
+    expect(store.get(1).solved).toBe(false);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });

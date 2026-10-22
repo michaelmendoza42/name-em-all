@@ -122,6 +122,18 @@ export class ProgressStore {
     if (!cur.solved) this.set(id, { ...cur, solved: true });
   }
 
+  // One save and one notification round for many ids (e.g. "fill in Gen 1").
+  solveMany(ids: readonly number[]) {
+    const changed = ids.filter((id) => !this.get(id).solved);
+    if (changed.length === 0) return;
+    const next = { ...this.map };
+    for (const id of changed) next[id] = { ...this.get(id), solved: true };
+    this.map = next;
+    this.write();
+    for (const id of changed) this.byId.get(id)?.forEach((l) => l());
+    this.all.forEach((l) => l());
+  }
+
   revealArtwork(id: number) {
     const cur = this.get(id);
     if (!cur.artwork) this.set(id, { ...cur, artwork: true });
