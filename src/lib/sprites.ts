@@ -16,8 +16,8 @@ export const iconPath = (gen: number, id: number) => `icons/${gen}/${id}.${ICON_
 
 export interface SpriteSlide {
   key: string;
-  label: string; // "Gen I", or "Animated" for the modern animated sprite
-  generation?: number; // undefined for the modern animated sprite
+  label: string; // "Gen I", "Gen VI/VII", or "Animated" for a later species' animated sprite
+  generation?: number; // the first generation shown; undefined for "Animated"
   path: string; // front sprite, relative to the app's base URL
   back?: { path: string; scale: number }; // back sprite, for a battle scene
   pixelArt: boolean; // render with hard pixel edges
@@ -26,33 +26,43 @@ export interface SpriteSlide {
 // Gen I stored back sprites at 32px and the games drew them doubled.
 const BACK_SCALE: Record<number, number> = { 1: 2 };
 
+// Showdown's animated sprites are the 3D models Gens VI–VII's games share
+// (their stills are mostly identical), so for species from those games the
+// animation stands in for both generations' stills on one slide.
+const ANIMATED_GENS = [6, 7];
+
 // The slides on a flipped card: the species' sprites from each generation's
-// games, oldest first, front and back together as a battle scene, then its
-// modern animated sprite when it has one, as a battle scene too when there's
-// an animated back to go with it.
+// games, oldest first, front and back together as a battle scene. A species
+// from Gen VII or earlier shows its animated sprite as one "Gen VI/VII" slide
+// in place of those stills; a later one shows it last, as "Animated".
 export function spriteSlides(
-  species: Pick<Species, "id" | "sprites" | "backSprites" | "animated" | "animatedBack">,
+  species: Pick<Species, "id" | "generation" | "sprites" | "backSprites" | "animated" | "animatedBack">,
 ): SpriteSlide[] {
-  const slides: SpriteSlide[] = (species.sprites ?? []).map((gen) => ({
-    key: `gen-${gen}`,
-    generation: gen,
-    label: `Gen ${romanGeneration(gen)}`,
-    path: frontSpritePath(gen, species.id),
-    back: species.backSprites?.includes(gen)
-      ? { path: backSpritePath(gen, species.id), scale: BACK_SCALE[gen] ?? 1 }
-      : undefined,
-    pixelArt: gen <= 7,
-  }));
-  if (species.animated) {
-    slides.push({
-      key: "anim",
-      label: "Animated",
-      path: `anim/${species.id}.gif`,
-      back: species.animatedBack ? { path: `anim/back/${species.id}.gif`, scale: 1 } : undefined,
-      pixelArt: true,
-    });
-  }
-  return slides;
+  const animGens = species.animated ? ANIMATED_GENS.filter((g) => g >= species.generation) : [];
+  const stills: SpriteSlide[] = (species.sprites ?? [])
+    .filter((gen) => !animGens.includes(gen))
+    .map((gen) => ({
+      key: `gen-${gen}`,
+      generation: gen,
+      label: `Gen ${romanGeneration(gen)}`,
+      path: frontSpritePath(gen, species.id),
+      back: species.backSprites?.includes(gen)
+        ? { path: backSpritePath(gen, species.id), scale: BACK_SCALE[gen] ?? 1 }
+        : undefined,
+      pixelArt: gen <= 7,
+    }));
+  if (!species.animated) return stills;
+  const animated: SpriteSlide = {
+    key: "anim",
+    generation: animGens[0],
+    label: animGens.length ? `Gen ${animGens.map(romanGeneration).join("/")}` : "Animated",
+    path: `anim/${species.id}.gif`,
+    back: species.animatedBack ? { path: `anim/back/${species.id}.gif`, scale: 1 } : undefined,
+    pixelArt: true,
+  };
+  if (!animGens.length) return [...stills, animated];
+  const at = stills.findIndex((s) => s.generation! > animGens[0]);
+  return at < 0 ? [...stills, animated] : [...stills.slice(0, at), animated, ...stills.slice(at)];
 }
 
 

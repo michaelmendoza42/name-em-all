@@ -66,12 +66,14 @@ describe("solved card flip", () => {
     // Each generation is a battle scene: front sprite as the foe, back sprite as yours.
     expect(container.querySelector('.battle .foe img[src$="sprites/1/25.png"]')).not.toBeNull();
     expect(container.querySelector('.battle .ally img[src$="sprites/back/1/25.png"]')).not.toBeNull();
-    // The animated sprite too, with its animated back.
-    expect(container.querySelectorAll(".sprite-slide.battle")).toHaveLength(10);
+    // Gens VI–VII share one slide: the animated front and back in place of their stills.
+    expect(container.querySelectorAll(".sprite-slide.battle")).toHaveLength(8);
     expect(container.querySelector('.battle .foe img[src$="anim/25.gif"]')).not.toBeNull();
     expect(container.querySelector('.battle .ally img[src$="anim/back/25.gif"]')).not.toBeNull();
+    expect(container.querySelector('img[src$="sprites/6/25.png"]')).toBeNull();
+    expect(container.querySelector('img[src$="sprites/7/25.png"]')).toBeNull();
     expect(label(container)).toBe("Gen I");
-    expect(container.querySelectorAll(".sprite-dots span")).toHaveLength(10);
+    expect(container.querySelectorAll(".sprite-dots span")).toHaveLength(8);
     expect(activeDot(container)).toBe(0);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/dex\/25\.json$/));
 
@@ -96,25 +98,24 @@ describe("solved card flip", () => {
     const next = screen.getByRole("button", { name: "Next sprite" });
     expect(label(container)).toBe("Gen I");
 
-    // Back from the first slide is the last (the animated sprite), and past it the first.
+    // Back from the first slide is the last, and past it the first.
     await user.click(prev);
-    expect(label(container)).toBe("Animated");
-    expect(activeDot(container)).toBe(9);
+    expect(label(container)).toBe("Gen IX");
+    expect(activeDot(container)).toBe(7);
     await user.click(next);
     expect(label(container)).toBe("Gen I");
     await user.click(prev);
     await user.click(prev);
     await user.click(prev);
-    await user.click(prev);
-    expect(label(container)).toBe("Gen VII");
-    expect(activeDot(container)).toBe(6);
+    expect(label(container)).toBe("Gen VI/VII");
+    expect(activeDot(container)).toBe(5);
 
-    // Flip back (clicking the sprite), then over again: still on Gen VII.
+    // Flip back (clicking the sprite), then over again: still on Gen VI/VII.
     await user.click(screen.getByRole("group", { name: /Pikachu's sprites/ }));
     expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(false);
     await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
-    expect(label(container)).toBe("Gen VII");
-    expect(activeDot(container)).toBe(6);
+    expect(label(container)).toBe("Gen VI/VII");
+    expect(activeDot(container)).toBe(5);
   });
 
   it("scrolls the entries to the sprite's generation, one way", async () => {
@@ -131,25 +132,24 @@ describe("solved card flip", () => {
     expect(current()).toBe("1");
     expect(regionScrolls().at(-1)?.[0]).toMatchObject({ behavior: "instant" });
 
-    // Back past Gen I wraps to the animated sprite, then on to Gen IX, VIII, VII.
-    for (let i = 0; i < 4; i++) await user.click(screen.getByRole("button", { name: "Previous sprite" }));
-    expect(label(container)).toBe("Gen VII");
-    expect(current()).toBe("7");
+    // Back past Gen I wraps to Gen IX, then on to VIII and VI/VII, which
+    // shows Gen VI's entries.
+    for (let i = 0; i < 3; i++) await user.click(screen.getByRole("button", { name: "Previous sprite" }));
+    expect(label(container)).toBe("Gen VI/VII");
+    expect(current()).toBe("6");
     expect(regionScrolls().at(-1)?.[0]).toMatchObject({ behavior: "smooth" });
 
     // Scrolling the entries leaves the carousel alone.
     region.scrollTop = 0;
     region.dispatchEvent(new Event("scroll"));
-    expect(label(container)).toBe("Gen VII");
+    expect(label(container)).toBe("Gen VI/VII");
 
-    // The animated sprite has no generation: the entries stay put.
     const calls = regionScrolls().length;
     await user.click(screen.getByRole("button", { name: "Next sprite" }));
     await user.click(screen.getByRole("button", { name: "Next sprite" }));
-    await user.click(screen.getByRole("button", { name: "Next sprite" }));
-    expect(label(container)).toBe("Animated");
-    expect(current()).toBeUndefined();
-    expect(regionScrolls().length).toBe(calls + 1); // to Gen VIII; IX has no entry; then none
+    expect(label(container)).toBe("Gen IX");
+    expect(current()).toBe("8");
+    expect(regionScrolls().length).toBe(calls + 1); // to Gen VIII; IX has no entry
     // The carousel jumps (no sweep) when it wraps around.
     const trackScrolls = scrollTo.mock.calls.filter((_, i) => scrollTo.mock.contexts[i] !== region);
     expect(trackScrolls.at(-1)?.[0]).toMatchObject({ behavior: "smooth" });
@@ -172,7 +172,7 @@ describe("solved card flip", () => {
     await user.keyboard("{ArrowRight}{ArrowRight}{ArrowLeft}");
     expect(label(container)).toBe("Gen II");
     await user.keyboard("{ArrowLeft}{ArrowLeft}");
-    expect(label(container)).toBe("Animated");
+    expect(label(container)).toBe("Gen IX");
     await user.keyboard("{Enter}");
     expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(false);
     expect(document.activeElement).toBe(front);
@@ -230,11 +230,22 @@ describe("sprite files", () => {
     expect(byName("Pikachu").icons).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
-  it("each species' first sprite is from the generation it premiered in", () => {
-    // Known gap: PokéAPI's Ultra Sun / Ultra Moon sprites stop at #802, so the
-    // Pokémon added after Sun / Moon (#803–809) open on their Gen VIII sprite.
-    const off = dataset.species.filter((s) => s.sprites?.length && s.sprites[0] !== s.generation);
-    expect(off.map((s) => s.id)).toEqual([803, 804, 805, 806, 807, 808, 809]);
+  it("each species' first slide is from the generation it premiered in", () => {
+    const off = dataset.species.filter((s) => {
+      const first = spriteSlides(s)[0];
+      return first && first.generation !== s.generation;
+    });
+    expect(off.map((s) => s.id)).toEqual([]);
+  });
+
+  it("the animated sprite stands in for Gens VI–VII, or comes last for later species", () => {
+    const labels = (name: string) => spriteSlides(byName(name)).map((s) => s.label);
+    expect(labels("Pikachu")).toEqual(["Gen I", "Gen II", "Gen III", "Gen IV", "Gen V", "Gen VI/VII", "Gen VIII", "Gen IX"]);
+    expect(labels("Rowlet")).toEqual(["Gen VII", "Gen VIII", "Gen IX"]);
+    // No Ultra Sun / Ultra Moon still (PokéAPI's stop at #802), but its animation fills in.
+    expect(labels("Poipole")).toEqual(["Gen VII", "Gen VIII"]);
+    expect(labels("Grookey")).toEqual(["Gen VIII", "Gen IX", "Animated"]);
+    expect(spriteSlides(byName("Grookey")).at(-1)?.generation).toBeUndefined();
   });
 
   it("no species lists a sprite or icon from before it existed", () => {
