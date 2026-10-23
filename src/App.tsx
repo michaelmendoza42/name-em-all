@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { buildAnswerIndex, type AnswerIndex } from "./lib/answers";
 import { loadDataset, type Dataset } from "./lib/dataset";
 import { groupByGeneration, type GenerationGroup } from "./lib/generations";
+import { isCollapsed, setCollapsed as saveCollapsed } from "./lib/collapsed";
 import { STORAGE_KEY, type ProgressStore } from "./lib/progress";
 import { focusAndGlide, isGliding } from "./lib/scroll";
 import { guessInputs, Tile } from "./components/Tile";
@@ -143,14 +144,16 @@ export function GenerationSection({
   const headingId = `gen-${group.generation}`;
   const wallId = `${headingId}-wall`;
   const complete = ids.length > 0 && solved === ids.length;
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => isCollapsed(group.generation));
   const sectionRef = useRef<HTMLElement>(null);
+  const toggled = useRef(false);
 
   // Collapsing from partway down a long section would leave the view far
-  // below its header; pull the header back up under the top bar.
+  // below its header; pull the header back up under the top bar. Skipped for
+  // sections restored collapsed on load, which the user didn't just toggle.
   useLayoutEffect(() => {
     const section = sectionRef.current;
-    if (!collapsed || !section) return;
+    if (!collapsed || !section || !toggled.current) return;
     const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bar-h")) || 0;
     const top = section.getBoundingClientRect().top;
     if (top < barH) window.scrollBy(0, top - barH);
@@ -171,7 +174,11 @@ export function GenerationSection({
               className="collapse-toggle"
               aria-expanded={!collapsed}
               aria-controls={wallId}
-              onClick={() => setCollapsed((c) => !c)}
+              onClick={() => {
+                toggled.current = true;
+                saveCollapsed(group.generation, !collapsed);
+                setCollapsed(!collapsed);
+              }}
             >
               <span className="chevron" aria-hidden="true" />
               {group.title}

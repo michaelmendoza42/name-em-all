@@ -39,6 +39,19 @@ describe("GenerationSection collapse", () => {
     expect(wall.hidden).toBe(false);
     expect(guessInputs()).toHaveLength(gen1.species.length);
   });
+
+  it("restores a collapsed generation after a reload", () => {
+    const store = new ProgressStore(new MemoryStorage());
+    const first = render(<GenerationSection group={gen1} store={store} answers={answers} />);
+    act(() => first.getByRole("button", { expanded: true }).click());
+    first.unmount();
+    const { container } = render(<GenerationSection group={gen1} store={store} answers={answers} />);
+    expect(container.querySelector("ol")!.hidden).toBe(true);
+    act(() => void container.querySelector<HTMLButtonElement>(".collapse-toggle")!.click());
+    cleanup();
+    const again = render(<GenerationSection group={gen1} store={store} answers={answers} />);
+    expect(again.container.querySelector("ol")!.hidden).toBe(false);
+  });
 });
 
 describe("JumpToNext", () => {
