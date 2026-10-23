@@ -26,11 +26,14 @@ export interface SpriteSlide {
 // Gen I stored back sprites at 32px and the games drew them doubled.
 const BACK_SCALE: Record<number, number> = { 1: 2 };
 
-// The slides on a flipped card: the species' sprites from each generation's
-// games, oldest first, front and back together as a battle scene, then its
-// modern animated sprite (front only) when it has one.
+// The slides on a flipped card: the species' modern animated sprite (front
+// only) when it has one, then its sprites from each generation's games, oldest
+// first, front and back together as a battle scene.
 export function spriteSlides(species: Pick<Species, "id" | "sprites" | "backSprites" | "animated">): SpriteSlide[] {
-  const slides: SpriteSlide[] = (species.sprites ?? []).map((gen) => ({
+  const slides: SpriteSlide[] = species.animated
+    ? [{ key: "anim", label: "Animated", path: `anim/${species.id}.gif`, pixelArt: true }]
+    : [];
+  for (const gen of species.sprites ?? []) slides.push({
     key: `gen-${gen}`,
     generation: gen,
     label: `Gen ${romanGeneration(gen)}`,
@@ -39,10 +42,7 @@ export function spriteSlides(species: Pick<Species, "id" | "sprites" | "backSpri
       ? { path: backSpritePath(gen, species.id), scale: BACK_SCALE[gen] ?? 1 }
       : undefined,
     pixelArt: gen <= 7,
-  }));
-  if (species.animated) {
-    slides.push({ key: "anim", label: "Animated", path: `anim/${species.id}.gif`, pixelArt: true });
-  }
+  });
   return slides;
 }
 

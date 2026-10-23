@@ -70,7 +70,7 @@ describe("solved card flip", () => {
     expect(container.querySelector('.sprite-slide:not(.battle) img[src$="anim/25.gif"]')).not.toBeNull();
     expect(label(container)).toBe("Gen IX");
     expect(container.querySelectorAll(".sprite-dots span")).toHaveLength(10);
-    expect(activeDot(container)).toBe(8);
+    expect(activeDot(container)).toBe(9);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/dex\/25\.json$/));
 
     // The entries replace the footer (name and types), not the picture.
@@ -87,28 +87,30 @@ describe("solved card flip", () => {
     expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(true);
   });
 
-  it("opens on the latest generation, pages with the chevrons, and remembers the sprite across flips", async () => {
+  it("opens on the latest generation, pages with the chevrons, wrapping both ways, and remembers the sprite across flips", async () => {
     const { user, container } = setupSolved("Pikachu");
     await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
     const prev = screen.getByRole("button", { name: "Previous sprite" });
-    const next = screen.getByRole("button", { name: "Next sprite" }) as HTMLButtonElement;
+    const next = screen.getByRole("button", { name: "Next sprite" });
     expect(label(container)).toBe("Gen IX");
 
+    // The animated sprite comes first; past the last slide is the first.
     await user.click(next);
     expect(label(container)).toBe("Animated");
-    expect(next.disabled).toBe(true);
+    expect(activeDot(container)).toBe(0);
     await user.click(prev);
+    expect(label(container)).toBe("Gen IX");
     await user.click(prev);
     await user.click(prev);
     expect(label(container)).toBe("Gen VII");
-    expect(activeDot(container)).toBe(6);
+    expect(activeDot(container)).toBe(7);
 
     // Flip back (clicking the sprite), then over again: still on Gen VII.
     await user.click(screen.getByRole("group", { name: /Pikachu's sprites/ }));
     expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(false);
     await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
     expect(label(container)).toBe("Gen VII");
-    expect(activeDot(container)).toBe(6);
+    expect(activeDot(container)).toBe(7);
   });
 
   it("scrolls the entries to the sprite's generation, one way", async () => {
@@ -145,6 +147,9 @@ describe("solved card flip", () => {
     expect(label(container)).toBe("Animated");
     expect(current()).toBeUndefined();
     expect(regionScrolls().length).toBe(calls + 1); // to Gen VIII; IX has no entry; then none
+    // The carousel jumps (no sweep) when it wraps around.
+    const trackScrolls = scrollTo.mock.calls.filter((_, i) => scrollTo.mock.contexts[i] !== region);
+    expect(trackScrolls.at(-1)?.[0]).toMatchObject({ left: 0, behavior: "instant" });
     delete (Element.prototype as Partial<Element>).scrollTo;
   });
 

@@ -18,7 +18,8 @@ interface Props {
 // picture turns over to a carousel of the species' sprites, one battle scene
 // (front and back) per generation (opening on the latest), while the footer turns over to its
 // Pokédex entries (DexFooter), which follow the sprite's generation. Swipe,
-// the chevrons or ←/→ move between sprites; the card remembers which one was
+// the chevrons or ←/→ move between sprites (the chevrons and arrows wrap
+// around from the last to the first and back); the card remembers which one was
 // showing across flips. Sprites only download once
 // the card has been flipped. With no sprites, the artwork stays put.
 export function FlipArt({ id, name, slides, index, onIndex, flipped, onFlip }: Props) {
@@ -48,8 +49,10 @@ export function FlipArt({ id, name, slides, index, onIndex, flipped, onFlip }: P
 
   function go(to: number) {
     const track = trackRef.current;
-    const i = Math.max(0, Math.min(slides.length - 1, to));
-    track?.scrollTo?.({ left: i * track.clientWidth, behavior: "smooth" });
+    const i = (to + slides.length) % slides.length;
+    // Wrapping jumps straight there rather than sweeping past every slide.
+    const behavior = i === to ? "smooth" : "instant";
+    track?.scrollTo?.({ left: i * track.clientWidth, behavior });
     onIndex(i);
   }
 
@@ -172,7 +175,6 @@ export function FlipArt({ id, name, slides, index, onIndex, flipped, onFlip }: P
                 type="button"
                 className="sprite-nav prev"
                 aria-label="Previous sprite"
-                disabled={index === 0}
                 tabIndex={-1}
                 onClick={() => go(index - 1)}
               >
@@ -182,7 +184,6 @@ export function FlipArt({ id, name, slides, index, onIndex, flipped, onFlip }: P
                 type="button"
                 className="sprite-nav next"
                 aria-label="Next sprite"
-                disabled={index === slides.length - 1}
                 tabIndex={-1}
                 onClick={() => go(index + 1)}
               >
