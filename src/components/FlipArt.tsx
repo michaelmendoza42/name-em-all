@@ -3,7 +3,27 @@ import type { FrontIcon, SpriteSlide } from "../lib/sprites";
 import "./flip.css";
 
 const BASE = import.meta.env.BASE_URL;
+// Pixel-art icons draw at twice their native size: whole pixels, so they stay sharp.
 const ICON_SCALE = 2;
+// Gen IX's icons are smooth renders up to 253px; all share one scale, where
+// the front spans this many of their pixels, so the largest just fits and
+// small Pokémon stay smaller than big ones.
+const RENDER_SPAN = 270;
+
+// Sizes a front image once it loads. Artwork fits the front (CSS). The
+// element is reused when the style changes, so every branch sets both sides.
+function sizeFront(img: HTMLImageElement, icon: FrontIcon | undefined) {
+  const { naturalWidth: w, naturalHeight: h } = img;
+  if (icon?.pixelArt) {
+    img.style.width = `${w * ICON_SCALE}px`;
+    img.style.height = "";
+  } else if (icon) {
+    img.style.width = `${(w / RENDER_SPAN) * 100}%`;
+    img.style.height = `${(h / RENDER_SPAN) * 100}%`;
+  } else {
+    img.style.width = img.style.height = "";
+  }
+}
 
 interface Props {
   id: number;
@@ -80,13 +100,7 @@ export function FlipArt({ id, name, icon, slides, index, onIndex, flipped, onFli
     <img
       src={icon ? `${BASE}${icon.path}` : `${BASE}art/${id}.webp`}
       className={icon ? `front-icon${icon.pixelArt ? " pixel" : ""}` : undefined}
-      // Pixel-art icons draw at twice their native size (whole pixels, so they
-      // stay sharp); artwork and Gen IX's renders fit the front (CSS). The
-      // element is reused when the style changes, so always reset the width.
-      onLoad={(e) => {
-        const img = e.currentTarget;
-        img.style.width = icon?.pixelArt ? `${img.naturalWidth * ICON_SCALE}px` : "";
-      }}
+      onLoad={(e) => sizeFront(e.currentTarget, icon)}
       alt={name}
       width={256}
       height={256}
