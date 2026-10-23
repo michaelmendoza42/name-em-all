@@ -47,9 +47,6 @@ export function FlipArt({ id, name, animated }: Props) {
           {loaded && <img src={`${BASE}anim/${id}.gif`} alt={`${name}, animated`} draggable={false} />}
         </span>
       </span>
-      <span className="flip-hint" aria-hidden="true">
-        ↻
-      </span>
     </button>
   );
 }
