@@ -243,8 +243,9 @@ main {
   position: relative;
   isolation: isolate;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
   padding: 7px 12px 6px;
   overflow: hidden;
   font-family: "VT323", ui-monospace, monospace;
@@ -278,6 +279,7 @@ main {
 
 .generation-head h2 {
   margin: 0;
+  white-space: nowrap;
   font-size: 22px;
   font-weight: 400;
   line-height: 1;
@@ -332,9 +334,32 @@ main {
 
 .generation-count {
   margin: 0 0 0 auto;
+  white-space: nowrap;
   font-size: 22px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+/* Unlocked by completing the generation: what its cards show on the front.
+   Sits above the header's stretched collapse button. */
+.icon-style {
+  position: relative;
+  z-index: 1;
+  margin-left: auto;
+  padding: 1px 4px;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--gba-ink);
+  background: var(--gba-panel);
+  border: 2px solid var(--gba-frame);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.icon-style:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* Full bar: a quick level-up flash. */

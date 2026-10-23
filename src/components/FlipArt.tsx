@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from "react";
-import type { SpriteSlide } from "../lib/sprites";
+import type { FrontIcon, SpriteSlide } from "../lib/sprites";
 import "./flip.css";
 
 const BASE = import.meta.env.BASE_URL;
@@ -7,6 +7,7 @@ const BASE = import.meta.env.BASE_URL;
 interface Props {
   id: number;
   name: string;
+  icon?: FrontIcon; // menu icon shown on the front instead of the artwork
   slides: readonly SpriteSlide[];
   index: number; // the slide showing; kept by the tile so it survives flips
   onIndex: (index: number) => void;
@@ -22,7 +23,7 @@ interface Props {
 // around from the last to the first and back); the card remembers which one was
 // showing across flips. Sprites only download once
 // the card has been flipped. With no sprites, the artwork stays put.
-export function FlipArt({ id, name, slides, index, onIndex, flipped, onFlip }: Props) {
+export function FlipArt({ id, name, icon, slides, index, onIndex, flipped, onFlip }: Props) {
   const frontRef = useRef<HTMLButtonElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const toggled = useRef(false);
@@ -76,10 +77,12 @@ export function FlipArt({ id, name, slides, index, onIndex, flipped, onFlip }: P
 
   const artwork = (
     <img
-      src={`${BASE}art/${id}.webp`}
+      src={icon ? `${BASE}${icon.path}` : `${BASE}art/${id}.webp`}
+      className={icon ? `front-icon${icon.pixelArt ? " pixel" : ""}` : undefined}
       alt={name}
       width={256}
       height={256}
+      onLoad={icon ? (e) => sizeIcon(e.currentTarget, icon.span) : undefined}
       loading="lazy"
       decoding="async"
       draggable={false}
@@ -200,6 +203,14 @@ export function FlipArt({ id, name, slides, index, onIndex, flipped, onFlip }: P
       </div>
     </div>
   );
+}
+
+// Draws an icon at its generation's scale, shrunk to fit if it's bigger than the front.
+function sizeIcon(img: HTMLImageElement, span: number) {
+  const { naturalWidth: w, naturalHeight: h } = img;
+  const fit = Math.min(1, span / Math.max(w, h));
+  img.style.width = `${(w / span) * fit * 100}%`;
+  img.style.height = `${(h / span) * fit * 100}%`;
 }
 
 function Chevron({ d }: { d: string }) {

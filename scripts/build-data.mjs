@@ -103,10 +103,12 @@ const SPRITE_SETS = [
     ],
   },
   {
-    // Menu / box icons. Gens III–V's are often the same file.
+    // Menu / box icons. Gens III–V's are often the same file. Cropped so
+    // each fills a card's front alike (Gen VIII's sit small in wide margins).
     name: "icons",
     dir: "icons",
     field: "icons",
+    crop: true,
     gens: [
       { gen: 3, ext: "png", sources: ["generation-iii/icons"] },
       { gen: 4, ext: "png", sources: ["generation-iv/icons"] },

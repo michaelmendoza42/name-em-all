@@ -15,7 +15,7 @@ import { normalizeAnswer, type AnswerIndex } from "../lib/answers";
 import { remainingPattern, revealableCount, revealedPrefix, visibleTypes } from "../lib/hints";
 import type { ProgressStore } from "../lib/progress";
 import { focusAndGlide } from "../lib/scroll";
-import { spriteSlides } from "../lib/sprites";
+import { iconFor, spriteSlides } from "../lib/sprites";
 import { DexFooter } from "./DexFooter";
 import { FlipArt } from "./FlipArt";
 import { HintMenu, type HintOption } from "./HintMenu";
@@ -26,6 +26,8 @@ interface Props {
   species: Species;
   store: ProgressStore;
   answers: AnswerIndex;
+  // Menu-icon generation to show on the solved front instead of the artwork.
+  iconGen?: number;
 }
 
 function useProgress(store: ProgressStore, id: number) {
@@ -58,7 +60,7 @@ function stripTyped(typed: string, added: string): string {
   return typed;
 }
 
-export const Tile = memo(function Tile({ species, store, answers }: Props) {
+export const Tile = memo(function Tile({ species, store, answers, iconGen }: Props) {
   const { id, name, types } = species;
   const progress = useProgress(store, id);
   const [guess, setGuess] = useState("");
@@ -209,6 +211,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
         <FlipArt
           id={id}
           name={name}
+          icon={iconGen === undefined ? undefined : iconFor(species, iconGen)}
           slides={slides}
           index={slide}
           onIndex={setSlide}

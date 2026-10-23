@@ -310,3 +310,13 @@
     transition: none;
   }
 }
+
+/* A completed generation's menu icon in place of the artwork: small source
+   images blown up (sized by FlipArt), pixel-crisp where they're pixel art. */
+.art.flip .flip-front img.front-icon {
+  padding: 0;
+}
+
+.art.flip .flip-front img.front-icon.pixel {
+  image-rendering: pixelated;
+}

@@ -56,12 +56,16 @@ git archive HEAD | docker build --build-arg REVISION=$(git rev-parse HEAD) -t na
   for Hisui), Scarlet/Violet. Gens VII–IX ship as still first frames (their
   animations run 0.2–2.6 MB each); VIII–IX are resized to 192px. Then the
   modern animated sprite (`public/anim`) when it differs from Gen V's.
-- **Back sprites and menu/box icons** (downloaded, not shown yet):
+- **Back sprites** (the near half of each carousel battle scene):
   `public/sprites/back/<gen>/<id>.*` from the same games as the fronts and in
-  the same formats (Gens I–II cut from their white backgrounds), and
-  `public/icons/<gen>/<id>.*` for Gens III–IX (Gen IX's as WebP). Each species
-  lists the generations it has as `backSprites` and `icons` in `pokedex.json`;
-  paths come from `src/lib/sprites.ts`.
+  the same formats (Gens I–II cut from their white backgrounds).
+- **Menu/box icons** (an unlock: once a generation is complete, a picker in its
+  header swaps its cards' front artwork for one game's icons, remembered per
+  generation): `public/icons/<gen>/<id>.*` for Gens III–IX (Gen IX's as WebP),
+  cropped to their visible pixels and drawn at one scale per generation. A
+  species missing from the chosen game uses its nearest older icon, else newer.
+- Each species lists the generations it has as `sprites`, `backSprites` and
+  `icons` in `pokedex.json`; paths come from `src/lib/sprites.ts`.
 - **Pokédex entries** (the footer of a flipped solved card): PokéAPI's English flavor
   text, one file per species (`public/dex/<id>.json`, fetched on first flip),
   grouped by the generation of the game. Line breaks and soft hyphens are

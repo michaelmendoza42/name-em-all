@@ -64,11 +64,27 @@ export function iconGenerations(species: readonly Pick<Species, "icons">[]): num
 
 // The species' icon closest to the chosen generation's style: that one, else
 // its latest icon before it, else its earliest after it. Undefined when the
-// species has no icons at all.
-export function iconFor(species: Pick<Species, "id" | "icons">, generation: number): string | undefined {
+// Icons are cropped to their visible pixels, so each generation gets a fixed
+// scale: a card's front spans this many of the icon's pixels. A typical icon
+// then fills about 60% of the front whatever its game, and small Pokémon stay
+// smaller than big ones.
+const ICON_SPAN: Record<number, number> = { 3: 36, 4: 36, 5: 36, 6: 38, 7: 38, 8: 50, 9: 240 };
+
+export interface FrontIcon {
+  path: string;
+  pixelArt: boolean;
+  span: number; // icon pixels across the whole front
+}
+
+// The species' icon closest to the chosen generation's style: that one, else
+// its latest icon before it, else its earliest after it. Undefined when the
+// species has no icons at all. Icons are pixel art up to Gen VIII.
+export function iconFor(species: Pick<Species, "id" | "icons">, generation: number): FrontIcon | undefined {
   const gens = species.icons ?? [];
   const gen = gens.includes(generation)
     ? generation
     : (gens.filter((g) => g < generation).at(-1) ?? gens.find((g) => g > generation));
-  return gen === undefined ? undefined : iconPath(gen, species.id);
+  return gen === undefined
+    ? undefined
+    : { path: iconPath(gen, species.id), pixelArt: gen <= 8, span: ICON_SPAN[gen] ?? 40 };
 }

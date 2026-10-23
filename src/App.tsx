@@ -13,10 +13,12 @@ import {
 import { createPortal } from "react-dom";
 import { buildAnswerIndex, type AnswerIndex } from "./lib/answers";
 import { loadDataset, type Dataset } from "./lib/dataset";
-import { groupByGeneration, type GenerationGroup } from "./lib/generations";
+import { groupByGeneration, romanGeneration, type GenerationGroup } from "./lib/generations";
 import { isCollapsed, setCollapsed as saveCollapsed } from "./lib/collapsed";
+import { getIconStyle, setIconStyle as saveIconStyle } from "./lib/iconStyle";
 import { STORAGE_KEY, type ProgressStore } from "./lib/progress";
 import { focusAndGlide, isGliding } from "./lib/scroll";
+import { iconGenerations } from "./lib/sprites";
 import { guessInputs, Tile } from "./components/Tile";
 
 const DATA_URL = `${import.meta.env.BASE_URL}pokedex.json`;
@@ -147,6 +149,10 @@ export function GenerationSection({
   const [collapsed, setCollapsed] = useState(() => isCollapsed(group.generation));
   const sectionRef = useRef<HTMLElement>(null);
   const toggled = useRef(false);
+  // Completing a generation unlocks swapping its cards' artwork for menu icons.
+  const iconGens = useMemo(() => iconGenerations(group.species), [group]);
+  const [iconStyle, setIconStyle] = useState(() => getIconStyle(group.generation));
+  const iconGen = complete && iconStyle !== undefined && iconGens.includes(iconStyle) ? iconStyle : undefined;
 
   // Collapsing from partway down a long section would leave the view far
   // below its header; pull the header back up under the top bar. Skipped for
@@ -189,11 +195,30 @@ export function GenerationSection({
             {complete && <span aria-hidden="true">✓ </span>}
             {fmt.format(solved)} / {fmt.format(ids.length)}
           </p>
+          {complete && iconGens.length > 0 && (
+            <select
+              className="icon-style"
+              aria-label={`Card fronts for ${group.title}`}
+              value={iconGen ?? ""}
+              onChange={(e) => {
+                const next = e.target.value ? Number(e.target.value) : undefined;
+                saveIconStyle(group.generation, next);
+                setIconStyle(next);
+              }}
+            >
+              <option value="">Artwork</option>
+              {iconGens.map((g) => (
+                <option key={g} value={g}>
+                  Gen {romanGeneration(g)} icons
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </header>
       <ol className="wall" id={wallId} start={ids[0]} hidden={collapsed}>
         {group.species.map((s) => (
-          <Tile key={s.id} species={s} store={store} answers={answers} />
+          <Tile key={s.id} species={s} store={store} answers={answers} iconGen={iconGen} />
         ))}
       </ol>
     </section>
