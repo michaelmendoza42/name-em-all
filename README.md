@@ -68,7 +68,7 @@ git archive HEAD | docker build --build-arg REVISION=$(git rev-parse HEAD) -t na
   (Gen IX's as WebP), plus Gens I–II's shared party shapes by body type (Red/Blue
   and Crystal), built from the [pret](https://github.com/pret) disassemblies'
   graphics and species tables. Cropped to their visible pixels and shown at
-  2× native size (whole pixels, so they stay sharp; Gen IX's shrink to fit). A species
+  2× native size (whole pixels, so they stay sharp); Gen IX's renders, not pixel art, fit the front like the artwork. A species
   missing from the chosen game uses its nearest older unlocked icon, else newer.
 - Each species lists the generations it has as `sprites`, `backSprites` and
   `icons` in `pokedex.json`; paths come from `src/lib/sprites.ts`.

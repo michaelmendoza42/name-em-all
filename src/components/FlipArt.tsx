@@ -80,8 +80,13 @@ export function FlipArt({ id, name, icon, slides, index, onIndex, flipped, onFli
     <img
       src={icon ? `${BASE}${icon.path}` : `${BASE}art/${id}.webp`}
       className={icon ? `front-icon${icon.pixelArt ? " pixel" : ""}` : undefined}
-      // Icons draw at twice their native size (whole pixels, so they stay sharp).
-      onLoad={icon ? (e) => (e.currentTarget.style.width = `${e.currentTarget.naturalWidth * ICON_SCALE}px`) : undefined}
+      // Pixel-art icons draw at twice their native size (whole pixels, so they
+      // stay sharp); artwork and Gen IX's renders fit the front (CSS). The
+      // element is reused when the style changes, so always reset the width.
+      onLoad={(e) => {
+        const img = e.currentTarget;
+        img.style.width = icon?.pixelArt ? `${img.naturalWidth * ICON_SCALE}px` : "";
+      }}
       alt={name}
       width={256}
       height={256}
