@@ -566,34 +566,135 @@ main {
 .type-steel { --type: #b7b7ce; }
 .type-fairy { --type: #d685ad; }
 
+/* The hint row keeps its height on every card, so cards never resize; the
+   Hint button in it only shows on the card you're on. */
 .hints {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.hints button {
+  position: relative;
+  display: flex;
+  justify-content: center;
   min-height: 28px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface);
-  font-size: 11px;
-  letter-spacing: -0.01em;
+}
+
+.hint-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1;
-  white-space: nowrap;
   cursor: pointer;
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    visibility 0s 0.15s;
 }
 
-.hints button:hover:not(:disabled) {
+.tile.engaged .hint-toggle,
+.tile:focus-within .hint-toggle {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 0.15s;
+}
+
+/* Hover only where hover is real: on iPad a hover-revealed button eats the tap. */
+@media (hover: hover) {
+  .tile:hover .hint-toggle {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0.15s;
+  }
+  .hint-toggle:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+}
+
+.hints.open .hint-toggle {
+  background: var(--accent);
   border-color: var(--accent);
+  color: var(--surface);
 }
 
-.hints button:disabled {
+.hint-toggle:disabled {
   cursor: default;
   color: var(--muted);
   background: transparent;
-  border-style: dashed;
+  border: 1px dashed var(--border);
+}
+
+/* Popover: floats over the bottom of the picture, above the name box
+   (hint row gap 6px + name box 36px + gap 6px + 6px inset). */
+.hint-menu {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: calc(100% + 54px);
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+}
+
+.hint-menu button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 40px;
+  padding: 4px 2px 3px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hint-menu button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.hint-menu button:disabled {
+  cursor: default;
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+/* Uses so far, tucked into the button's top-right corner. */
+.hint-count {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+@media (pointer: coarse) {
+  .hint-menu button {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint-toggle,
+  .tile .hint-toggle {
+    transition: none;
+  }
 }
 
 /* Floating "next unsolved" button: fades in on scroll, out when idle. */

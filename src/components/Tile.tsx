@@ -18,6 +18,7 @@ import { focusAndGlide } from "../lib/scroll";
 import { defaultSlide, spriteSlides } from "../lib/sprites";
 import { DexFooter } from "./DexFooter";
 import { FlipArt } from "./FlipArt";
+import { ArtIcon, HintMenu, LetterIcon, TypeIcon, type HintOption } from "./HintMenu";
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -70,7 +71,12 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
   const [slide, setSlide] = useState(() => defaultSlide(slides));
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const hintsRef = useRef<HTMLDivElement>(null);
+  const tileRef = useRef<HTMLLIElement>(null);
+  const hintToggleRef = useRef<HTMLButtonElement>(null);
+  // The Hint button only shows on the card you're on: hovered, focused, or
+  // tapped (touch has no hover, so a tap "engages" the card until you tap away).
+  const [engaged, setEngaged] = useState(false);
+  const [hintsOpen, setHintsOpen] = useState(false);
   const nameRef = useRef<HTMLParagraphElement>(null);
   const number = `#${String(id).padStart(4, "0")}`;
   const label = `Pokémon ${number}`;
@@ -117,7 +123,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
   }
 
   // Tab / Shift+Tab jump straight to the next / previous unsolved name input,
-  // skipping hint buttons. ArrowDown reaches this tile's hints.
+  // skipping hint buttons. ArrowDown reaches this tile's Hint button.
   function onInputKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       // Only needed once every letter is locked in and nothing is left to type.
@@ -130,30 +136,68 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
         target.focus();
       }
     } else if (e.key === "ArrowDown") {
-      const first = hintsRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)");
-      if (first) {
+      const toggle = hintToggleRef.current;
+      if (toggle && !toggle.disabled) {
         e.preventDefault();
-        first.focus();
+        toggle.focus();
       }
     }
   }
 
-  // ArrowLeft/Right move between hint buttons, ArrowUp returns to the input.
-  function onHintsKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
-    const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const move = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
-    if (move && buttons[i + move]) {
-      e.preventDefault();
-      buttons[i + move].focus();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      inputRef.current?.focus();
+  // A tap or click elsewhere on the page disengages the card and closes its hints.
+  useEffect(() => {
+    if (!engaged && !hintsOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (tileRef.current?.contains(e.target as Node)) return;
+      setEngaged(false);
+      setHintsOpen(false);
     }
-  }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [engaged, hintsOpen]);
+
+  const hintOptions: HintOption[] = [
+    {
+      key: "artwork",
+      icon: <ArtIcon />,
+      text: "Artwork",
+      done: progress.artwork,
+      label: progress.artwork ? `Artwork revealed for ${label}` : `Reveal artwork for ${label}`,
+      title: progress.artwork ? "Artwork revealed" : "Reveal the artwork",
+      onReveal: () => store.revealArtwork(id),
+    },
+    {
+      key: "type",
+      icon: <TypeIcon />,
+      text: "Type",
+      count: `${typesShown.length}/${types.length}`,
+      done: allTypes,
+      label: allTypes ? `All types revealed for ${label}` : `Reveal Type for ${label}`,
+      title: allTypes ? "All types revealed" : "Reveal a type",
+      onReveal: () => store.revealType(id, types.length),
+    },
+    {
+      key: "letter",
+      icon: <LetterIcon />,
+      text: "Letter",
+      count: `${progress.letters}/${letterTotal}`,
+      done: allLetters,
+      label: allLetters ? `All letters revealed for ${label}` : `Reveal Letter for ${label}`,
+      title: allLetters ? "All letters revealed" : "Reveal the next letter",
+      onReveal: () => store.revealLetter(id, letterTotal),
+    },
+  ];
 
   return (
-    <li className={`tile${progress.solved ? " solved" : ""}${justSolved ? " just-solved" : ""}`}>
+    <li
+      ref={tileRef}
+      className={`tile${progress.solved ? " solved" : ""}${justSolved ? " just-solved" : ""}${engaged || hintsOpen ? " engaged" : ""}`}
+      onPointerDown={progress.solved ? undefined : () => setEngaged(true)}
+      onBlur={(e) => {
+        // Focus moving to another card closes this one's hints.
+        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setHintsOpen(false);
+      }}
+    >
       <span className="dex">{number}</span>
       {progress.solved ? (
         <FlipArt
@@ -240,35 +284,14 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
               </span>
             )}
           </div>
-          <div className="hints" ref={hintsRef} onKeyDown={onHintsKeyDown} role="group" aria-label={`Hints for ${label}`}>
-            <button
-              type="button"
-              onClick={() => store.revealArtwork(id)}
-              disabled={progress.artwork}
-              aria-label={progress.artwork ? `Artwork revealed for ${label}` : `Reveal artwork for ${label}`}
-              title={progress.artwork ? "Artwork revealed" : "Reveal Artwork"}
-            >
-              Artwork
-            </button>
-            <button
-              type="button"
-              onClick={() => store.revealType(id, types.length)}
-              disabled={allTypes}
-              aria-label={allTypes ? `All types revealed for ${label}` : `Reveal Type for ${label}`}
-              title={allTypes ? "All types revealed" : "Reveal Type"}
-            >
-              Type
-            </button>
-            <button
-              type="button"
-              onClick={() => store.revealLetter(id, letterTotal)}
-              disabled={allLetters}
-              aria-label={allLetters ? `All letters revealed for ${label}` : `Reveal Letter for ${label}`}
-              title={allLetters ? "All letters revealed" : "Reveal Letter"}
-            >
-              Letter
-            </button>
-          </div>
+          <HintMenu
+            tileLabel={label}
+            options={hintOptions}
+            open={hintsOpen}
+            onOpenChange={setHintsOpen}
+            toggleRef={hintToggleRef}
+            onExitUp={() => inputRef.current?.focus()}
+          />
         </>
       )}
     </li>

@@ -21,6 +21,11 @@ function setup(name: string, storage = new MemoryStorage()) {
   return { ...utils, species, store, storage, label, user: userEvent.setup() };
 }
 
+// Hints live behind one Hint button per tile; open it before revealing.
+async function openHints(user: ReturnType<typeof userEvent.setup>, label: string) {
+  await user.click(screen.getByRole("button", { name: `Hint for ${label}` }));
+}
+
 describe("Tile", () => {
   it("starts as an unlabeled silhouette with no name or types in the DOM", () => {
     const { container, label } = setup("Bulbasaur");
@@ -68,6 +73,7 @@ describe("Tile", () => {
 
   it("Reveal Artwork shows the art but not the name", async () => {
     const { user, label, container, store } = setup("Pikachu");
+    await openHints(user, label);
     await user.click(screen.getByRole("button", { name: `Reveal artwork for ${label}` }));
     expect(screen.getByRole("img").getAttribute("src")).toMatch(/art\/25\.webp$/);
     expect(container.innerHTML).not.toMatch(/pikachu/i);
@@ -77,6 +83,7 @@ describe("Tile", () => {
 
   it("Reveal Type shows one type per click for a dual type", async () => {
     const { user, label } = setup("Bulbasaur");
+    await openHints(user, label);
     const types = () => Array.from(document.querySelectorAll(".type")).map((e) => e.textContent);
     await user.click(screen.getByRole("button", { name: `Reveal Type for ${label}` }));
     expect(types()).toEqual(["grass"]);
@@ -87,6 +94,7 @@ describe("Tile", () => {
 
   it("Reveal Type on a single type shows one type, then is done", async () => {
     const { user, label } = setup("Pikachu");
+    await openHints(user, label);
     await user.click(screen.getByRole("button", { name: `Reveal Type for ${label}` }));
     expect(document.querySelectorAll(".type")).toHaveLength(1);
     expect(screen.getByText("electric")).toBeTruthy();
@@ -95,6 +103,7 @@ describe("Tile", () => {
 
   it("Reveal Letter locks one more letter into the input per click and never auto-solves", async () => {
     const { user, label, container, store } = setup("Mew");
+    await openHints(user, label);
     const btn = () => screen.getByRole("button", { name: /letter/i }) as HTMLButtonElement;
     const input = () => screen.getByLabelText(`Name of ${label}`) as HTMLInputElement;
     const prefix = () => container.querySelector(".prefix")?.textContent ?? "";
@@ -116,12 +125,14 @@ describe("Tile", () => {
 
   it("solves from the locked prefix plus the typed rest, or the full name typed", async () => {
     const a = setup("Charmander");
+    await openHints(a.user, a.label);
     await a.user.click(screen.getByRole("button", { name: /Reveal Letter/ }));
     await a.user.click(screen.getByRole("button", { name: /Reveal Letter/ }));
     await a.user.type(screen.getByLabelText(`Name of ${a.label}`), "armander");
     expect(a.store.get(4).solved).toBe(true);
     cleanup();
     const b = setup("Charmander");
+    await openHints(b.user, b.label);
     await b.user.click(screen.getByRole("button", { name: /Reveal Letter/ }));
     await b.user.type(screen.getByLabelText(`Name of ${b.label}`), "charmander");
     expect(b.store.get(4).solved).toBe(true);
@@ -129,6 +140,7 @@ describe("Tile", () => {
 
   it("revealing a letter already typed doesn't double it", async () => {
     const { user, label, store } = setup("Charmander");
+    await openHints(user, label);
     const input = screen.getByLabelText(`Name of ${label}`) as HTMLInputElement;
     await user.type(input, "Cha");
     await user.click(screen.getByRole("button", { name: /Reveal Letter/ }));
@@ -191,14 +203,40 @@ describe("keyboard flow", () => {
     expect(document.activeElement).toBe(input("Bulbasaur"));
   });
 
-  it("ArrowDown reaches the tile's hint buttons and ArrowUp returns", async () => {
+  it("ArrowDown reaches the Hint button, which opens onto the hints; Escape and ArrowUp go back", async () => {
     const { input, user } = setupWall(["Bulbasaur", "Ivysaur"]);
+    const active = () => document.activeElement?.getAttribute("aria-label");
     await user.click(input("Bulbasaur"));
     await user.keyboard("{ArrowDown}");
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Reveal artwork for Pokémon #0001");
-    await user.keyboard("{ArrowRight}");
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Reveal Type for Pokémon #0001");
+    expect(active()).toBe("Hint for Pokémon #0001");
+    await user.keyboard("{Enter}");
+    expect(active()).toBe("Reveal artwork for Pokémon #0001");
+    await user.keyboard("{ArrowDown}");
+    expect(active()).toBe("Reveal Type for Pokémon #0001");
+    await user.keyboard("{Escape}");
+    expect(active()).toBe("Hint for Pokémon #0001");
+    expect(screen.queryByRole("button", { name: /Reveal/ })).toBeNull();
     await user.keyboard("{ArrowUp}");
     expect(document.activeElement).toBe(input("Bulbasaur"));
+  });
+
+  it("hints stay closed until asked for, and close when another card is used", async () => {
+    const { input, user } = setupWall(["Bulbasaur", "Ivysaur"]);
+    expect(screen.queryByRole("button", { name: /Reveal/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Hint for Pokémon #0001" }));
+    expect(screen.getByRole("button", { name: "Reveal Type for Pokémon #0001" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Hint for Pokémon #0001" }).getAttribute("aria-expanded")).toBe("true");
+    await user.click(input("Ivysaur"));
+    expect(screen.queryByRole("button", { name: /Reveal/ })).toBeNull();
+  });
+
+  it("marks only the card being used as engaged", async () => {
+    const { input, user } = setupWall(["Bulbasaur", "Ivysaur"]);
+    const tile = (n: string) => input(n).closest("li")!;
+    await user.click(input("Bulbasaur"));
+    expect(tile("Bulbasaur").classList.contains("engaged")).toBe(true);
+    await user.click(input("Ivysaur"));
+    expect(tile("Bulbasaur").classList.contains("engaged")).toBe(false);
+    expect(tile("Ivysaur").classList.contains("engaged")).toBe(true);
   });
 });
