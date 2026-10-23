@@ -5,6 +5,14 @@ import { romanGeneration } from "./generations";
 // GEN_SPRITES in scripts/build-data.mjs. Gen V's animate; VII–IX are still
 // frames, VIII and IX of larger 3D renders.
 const EXT: Record<number, string> = { 5: "gif", 8: "webp", 9: "webp" };
+// Menu / box icons are PNG, except Gen IX's (re-encoded from large PNGs).
+const ICON_EXT: Record<number, string> = { 9: "webp" };
+
+// Paths, relative to the app's base URL, for generations listed in a
+// species' sprites / backSprites / icons. Back sprites share the front's formats.
+export const frontSpritePath = (gen: number, id: number) => `sprites/${gen}/${id}.${EXT[gen] ?? "png"}`;
+export const backSpritePath = (gen: number, id: number) => `sprites/back/${gen}/${id}.${EXT[gen] ?? "png"}`;
+export const iconPath = (gen: number, id: number) => `icons/${gen}/${id}.${ICON_EXT[gen] ?? "png"}`;
 
 export interface SpriteSlide {
   key: string;
@@ -21,7 +29,7 @@ export function spriteSlides(species: Pick<Species, "id" | "sprites" | "animated
     key: `gen-${gen}`,
     generation: gen,
     label: `Gen ${romanGeneration(gen)}`,
-    path: `sprites/${gen}/${species.id}.${EXT[gen] ?? "png"}`,
+    path: frontSpritePath(gen, species.id),
     pixelArt: gen <= 7,
   }));
   if (species.animated) {

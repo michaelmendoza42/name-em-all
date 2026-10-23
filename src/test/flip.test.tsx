@@ -7,7 +7,7 @@ import { Tile } from "../components/Tile";
 import { buildAnswerIndex } from "../lib/answers";
 import { groupDexEntries, parseDexEntries } from "../lib/dexEntries";
 import { ProgressStore } from "../lib/progress";
-import { spriteSlides } from "../lib/sprites";
+import { backSpritePath, iconPath, spriteSlides } from "../lib/sprites";
 import { MemoryStorage, byName, dataset } from "./fixtures";
 
 const answers = buildAnswerIndex(dataset.species);
@@ -195,8 +195,24 @@ describe("sprite files", () => {
     }
   });
 
-  it("no species lists a sprite from before it existed", () => {
-    for (const s of dataset.species) expect(s.sprites?.every((g) => g >= s.generation), s.name).toBe(true);
+  it("every listed back sprite and menu icon exists on disk", () => {
+    for (const s of dataset.species) {
+      const paths = [
+        ...(s.backSprites ?? []).map((g) => backSpritePath(g, s.id)),
+        ...(s.icons ?? []).map((g) => iconPath(g, s.id)),
+      ];
+      for (const p of paths) expect(existsSync(path.resolve(process.cwd(), "public", p)), p).toBe(true);
+    }
+    expect(byName("Pikachu").backSprites).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(byName("Pikachu").icons).toEqual([3, 4, 5, 6, 7, 8, 9]);
+  });
+
+  it("no species lists a sprite or icon from before it existed", () => {
+    for (const s of dataset.species) {
+      for (const gens of [s.sprites, s.backSprites, s.icons]) {
+        expect(gens?.every((g) => g >= s.generation), s.name).toBe(true);
+      }
+    }
   });
 });
 

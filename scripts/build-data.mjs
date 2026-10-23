@@ -9,6 +9,9 @@
 //   public/sprites/<gen>/<id>.<ext>
 //                            the in-game sprite from each generation's games
 //                            (swiped through on a flipped card)
+//   public/sprites/back/<gen>/<id>.<ext>, public/icons/<gen>/<id>.<ext>
+//                            the same games' back sprites and menu/box icons
+//                            (downloaded, not shown yet)
 //   public/dex/<id>.json     English Pokédex entries (flavor text) by
 //                            generation, shown on the back of a flipped card
 //
@@ -34,27 +37,82 @@ const ANIM_SOURCES = [
   { name: "showdown", url: (id) => `${SPRITES}/other/showdown/${id}.gif` },
   { name: "black-white", url: (id) => `${SPRITES}/versions/generation-v/black-white/animated/${id}.gif` },
 ];
-// One sprite per generation, from that generation's games, tried in order.
+// Per-generation sprites from each generation's games, tried in order. Each
+// set lands in public/<dir>/<gen>/<id>.<ext>, and the generations a species
+// has are listed on it in pokedex.json under `field`. Output extensions must
+// match src/lib/sprites.ts.
+//
+// How a file is prepared (all optional):
+//   from        source extension, when it differs from the output's
+//   still       keep only the first frame; with size, resize to size×size
+//   whiteToAlpha  Gens I–II backs have no transparent version: clear the
+//               white background, flood-filled in from the edges so white
+//               inside the outline stays
+//   webp        re-encode a large PNG as WebP
+//
 // Gens I–VI ship as-is (Gen V's animate). Gen VII's animated GIFs average
 // 165 KB (130 MB in all), and Gens VIII–IX are 512px animated renders of
-// 0.5–2.6 MB each, so those ship as a still first frame, VIII–IX resized.
-// Output extensions must match src/lib/sprites.ts.
+// 0.4–2.6 MB each, so those ship as a still first frame, VIII–IX resized.
 const VERSIONS = `${SPRITES}/versions`;
-const GEN_SPRITES = [
-  { gen: 1, ext: "png", sources: ["generation-i/red-blue/transparent"] },
-  { gen: 2, ext: "png", sources: ["generation-ii/crystal/transparent"] },
-  { gen: 3, ext: "png", sources: ["generation-iii/emerald"] },
-  { gen: 4, ext: "png", sources: ["generation-iv/platinum"] },
-  { gen: 5, ext: "gif", sources: ["generation-v/black-white/animated"] },
-  { gen: 6, ext: "png", sources: ["generation-vi/x-y"] },
-  { gen: 7, ext: "png", still: { from: "gif" }, sources: ["generation-vii/ultra-sun-ultra-moon"] },
+const RENDER_STILL = { from: "webp", size: 192 };
+const SPRITE_SETS = [
   {
-    gen: 8,
-    ext: "webp",
-    still: { from: "webp", size: 192 },
-    sources: ["generation-viii/sword-shield", "generation-viii/legends-arceus"],
+    name: "front sprites",
+    dir: "sprites",
+    field: "sprites",
+    gens: [
+      { gen: 1, ext: "png", sources: ["generation-i/red-blue/transparent"] },
+      { gen: 2, ext: "png", sources: ["generation-ii/crystal/transparent"] },
+      { gen: 3, ext: "png", sources: ["generation-iii/emerald"] },
+      { gen: 4, ext: "png", sources: ["generation-iv/platinum"] },
+      { gen: 5, ext: "gif", sources: ["generation-v/black-white/animated"] },
+      { gen: 6, ext: "png", sources: ["generation-vi/x-y"] },
+      { gen: 7, ext: "png", from: "gif", still: {}, sources: ["generation-vii/ultra-sun-ultra-moon"] },
+      {
+        gen: 8,
+        ext: "webp",
+        still: RENDER_STILL,
+        sources: ["generation-viii/sword-shield", "generation-viii/legends-arceus"],
+      },
+      { gen: 9, ext: "webp", still: RENDER_STILL, sources: ["generation-ix/scarlet-violet"] },
+    ],
   },
-  { gen: 9, ext: "webp", still: { from: "webp", size: 192 }, sources: ["generation-ix/scarlet-violet"] },
+  {
+    name: "back sprites",
+    dir: "sprites/back",
+    field: "backSprites",
+    gens: [
+      { gen: 1, ext: "png", whiteToAlpha: true, sources: ["generation-i/red-blue/back"] },
+      { gen: 2, ext: "png", whiteToAlpha: true, sources: ["generation-ii/crystal/back"] },
+      { gen: 3, ext: "png", sources: ["generation-iii/emerald/back"] },
+      { gen: 4, ext: "png", sources: ["generation-iv/platinum/back"] },
+      { gen: 5, ext: "gif", sources: ["generation-v/black-white/animated/back"] },
+      { gen: 6, ext: "png", sources: ["generation-vi/x-y/back"] },
+      { gen: 7, ext: "png", from: "gif", still: {}, sources: ["generation-vii/ultra-sun-ultra-moon/back"] },
+      {
+        gen: 8,
+        ext: "webp",
+        still: RENDER_STILL,
+        sources: ["generation-viii/sword-shield/back", "generation-viii/legends-arceus/back"],
+      },
+      { gen: 9, ext: "webp", still: RENDER_STILL, sources: ["generation-ix/scarlet-violet/back"] },
+    ],
+  },
+  {
+    // Menu / box icons. Gens III–V's are often the same file.
+    name: "icons",
+    dir: "icons",
+    field: "icons",
+    gens: [
+      { gen: 3, ext: "png", sources: ["generation-iii/icons"] },
+      { gen: 4, ext: "png", sources: ["generation-iv/icons"] },
+      { gen: 5, ext: "png", sources: ["generation-v/icons"] },
+      { gen: 6, ext: "png", sources: ["generation-vi/icons"] },
+      { gen: 7, ext: "png", sources: ["generation-vii/icons"] },
+      { gen: 8, ext: "png", sources: ["generation-viii/sword-shield/icons"] },
+      { gen: 9, ext: "webp", from: "png", webp: true, sources: ["generation-ix/scarlet-violet/icons"] },
+    ],
+  },
 ];
 const SPRITES_MISSING = path.join(ROOT, "scripts", ".cache", "sprites-missing.json");
 const IMAGE_SIZE = 256;
@@ -259,38 +317,66 @@ async function fetchFile(url) {
   }
 }
 
-// Builds public/sprites/<gen>/<id>.<ext> for every generation the species
-// existed in and returns those generations. Known 404s are remembered in
-// scripts/.cache so re-runs don't ask again.
-async function buildGenSprites(entry, missing) {
+// Clears the white background of a sprite drawn on white: every white
+// pixel reachable from the edge through other white pixels turns transparent.
+async function whiteToAlpha(file) {
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const white = (i) => data[i * 4] >= 248 && data[i * 4 + 1] >= 248 && data[i * 4 + 2] >= 248;
+  const seen = new Uint8Array(width * height);
+  const stack = [];
+  for (let x = 0; x < width; x++) stack.push(x, (height - 1) * width + x);
+  for (let y = 0; y < height; y++) stack.push(y * width, y * width + width - 1);
+  while (stack.length) {
+    const i = stack.pop();
+    if (seen[i] || !white(i)) continue;
+    seen[i] = 1;
+    data[i * 4 + 3] = 0;
+    const x = i % width;
+    if (x > 0) stack.push(i - 1);
+    if (x < width - 1) stack.push(i + 1);
+    if (i >= width) stack.push(i - width);
+    if (i < width * (height - 1)) stack.push(i + width);
+  }
+  return sharp(data, { raw: { width, height, channels: 4 } }).png({ palette: true });
+}
+
+async function prepareSprite(file, spec) {
+  if (spec.still?.size) {
+    return sharp(file, { page: 0 })
+      .resize(spec.still.size, spec.still.size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .webp({ quality: 80, alphaQuality: 90 })
+      .toBuffer();
+  }
+  if (spec.still) return sharp(file, { page: 0 }).png({ palette: true }).toBuffer();
+  if (spec.whiteToAlpha) return (await whiteToAlpha(file)).toBuffer();
+  if (spec.webp) return sharp(file).webp({ quality: 85, alphaQuality: 90 }).toBuffer();
+  return file;
+}
+
+// Builds one set's files for every generation the species existed in and
+// returns those generations. Known 404s are remembered in scripts/.cache so
+// re-runs don't ask again.
+async function buildSpriteSet(entry, set, missing) {
   const gens = [];
-  for (const { gen, ext, still, sources } of GEN_SPRITES) {
-    if (gen < entry.generation) continue;
-    const out = path.join(PUBLIC, "sprites", String(gen), `${entry.id}.${ext}`);
-    const key = `${gen}/${entry.id}`;
+  for (const spec of set.gens) {
+    if (spec.gen < entry.generation) continue;
+    const out = path.join(PUBLIC, set.dir, String(spec.gen), `${entry.id}.${spec.ext}`);
+    const key = `${set.dir}/${spec.gen}/${entry.id}`;
     if (!FORCE_IMAGES && (await exists(out))) {
-      gens.push(gen);
+      gens.push(spec.gen);
       continue;
     }
     if (!FORCE_IMAGES && missing.has(key)) continue;
     let found = false;
-    for (const source of sources) {
-      const file = await fetchFile(`${VERSIONS}/${source}/${entry.artworkId}.${still?.from ?? ext}`);
+    for (const source of spec.sources) {
+      const file = await fetchFile(`${VERSIONS}/${source}/${entry.artworkId}.${spec.from ?? spec.ext}`);
       if (!file) continue;
-      if (still?.size) {
-        await sharp(file, { page: 0 })
-          .resize(still.size, still.size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
-          .webp({ quality: 80, alphaQuality: 90 })
-          .toFile(out);
-      } else if (still) {
-        await sharp(file, { page: 0 }).png({ palette: true }).toFile(out);
-      } else {
-        await writeFile(out, file);
-      }
+      await writeFile(out, await prepareSprite(file, spec));
       found = true;
       break;
     }
-    if (found) gens.push(gen);
+    if (found) gens.push(spec.gen);
     else missing.add(key);
   }
   return gens;
@@ -336,10 +422,12 @@ async function main() {
   console.log(`  animated sprites: ${entries.length - missing.length}/${entries.length}`);
   if (missing.length) console.log(`  no animation for #${missing.join(", #")}`);
 
-  await Promise.all(GEN_SPRITES.map(({ gen }) => mkdir(path.join(PUBLIC, "sprites", String(gen)), { recursive: true })));
+  for (const set of SPRITE_SETS) {
+    await Promise.all(set.gens.map(({ gen }) => mkdir(path.join(PUBLIC, set.dir, String(gen)), { recursive: true })));
+  }
   const missingSprites = new Set(await readFile(SPRITES_MISSING, "utf8").then(JSON.parse, () => []));
   const spriteFailures = await runPool(entries, 12, async (e) => {
-    e.sprites = await buildGenSprites(e, missingSprites);
+    for (const set of SPRITE_SETS) e[set.field] = await buildSpriteSet(e, set, missingSprites);
     // The Gen V slide already shows this animation when it came from Black/White.
     if (e.animated && e.sprites.includes(5)) {
       const [anim, bw] = await Promise.all([
@@ -351,9 +439,12 @@ async function main() {
   });
   await writeFile(SPRITES_MISSING, JSON.stringify([...missingSprites].sort()) + "\n");
   if (spriteFailures.length) throw new Error(`Sprite build failed:\n  ${spriteFailures.join("\n  ")}`);
-  for (const { gen } of GEN_SPRITES) {
-    const have = entries.filter((e) => e.sprites.includes(gen)).length;
-    console.log(`  Gen ${gen} sprites: ${have}/${entries.filter((e) => e.generation <= gen).length}`);
+  for (const set of SPRITE_SETS) {
+    const counts = set.gens.map(({ gen }) => {
+      const have = entries.filter((e) => e[set.field].includes(gen)).length;
+      return `${gen}: ${have}/${entries.filter((e) => e.generation <= gen).length}`;
+    });
+    console.log(`  ${set.name} by gen — ${counts.join(", ")}`);
   }
 
   await buildDexEntries(entries);
@@ -362,7 +453,7 @@ async function main() {
     source: "PokéAPI (graphql.pokeapi.co) + PokeAPI/sprites official artwork",
     generatedAt: new Date().toISOString(),
     count: entries.length,
-    species: entries.map(({ id, slug, name, generation, types, animated, sprites }) => ({
+    species: entries.map(({ id, slug, name, generation, types, animated, sprites, backSprites, icons }) => ({
       id,
       slug,
       name,
@@ -370,6 +461,8 @@ async function main() {
       types,
       animated,
       sprites,
+      backSprites,
+      icons,
     })),
   };
   await writeFile(path.join(PUBLIC, "pokedex.json"), JSON.stringify(dataset) + "\n");
