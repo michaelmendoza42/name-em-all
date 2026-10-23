@@ -9,6 +9,7 @@ const EXT: Record<number, string> = { 5: "gif", 8: "webp", 9: "webp" };
 export interface SpriteSlide {
   key: string;
   label: string; // "Gen I", or "Animated" for the modern animated sprite
+  generation?: number; // undefined for the modern animated sprite
   path: string; // relative to the app's base URL
   pixelArt: boolean; // render with hard pixel edges
 }
@@ -18,6 +19,7 @@ export interface SpriteSlide {
 export function spriteSlides(species: Pick<Species, "id" | "sprites" | "animated">): SpriteSlide[] {
   const slides: SpriteSlide[] = (species.sprites ?? []).map((gen) => ({
     key: `gen-${gen}`,
+    generation: gen,
     label: `Gen ${romanGeneration(gen)}`,
     path: `sprites/${gen}/${species.id}.${EXT[gen] ?? "png"}`,
     pixelArt: gen <= 7,
@@ -26,4 +28,9 @@ export function spriteSlides(species: Pick<Species, "id" | "sprites" | "animated
     slides.push({ key: "anim", label: "Animated", path: `anim/${species.id}.gif`, pixelArt: true });
   }
   return slides;
+}
+
+// The slide a card opens on: the latest generation's sprite.
+export function defaultSlide(slides: readonly SpriteSlide[]): number {
+  return Math.max(0, slides.findLastIndex((s) => s.generation !== undefined));
 }

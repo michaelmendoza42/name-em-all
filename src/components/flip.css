@@ -226,6 +226,11 @@
   text-transform: uppercase;
 }
 
+/* The generation whose sprite is showing in the carousel. */
+.dex-gen.current h3::after {
+  content: " ◂";
+}
+
 .dex-gen p {
   margin: 0 0 4px;
 }

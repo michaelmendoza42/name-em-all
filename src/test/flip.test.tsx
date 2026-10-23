@@ -63,8 +63,9 @@ describe("solved card flip", () => {
     expect(container.querySelector('img[src$="sprites/1/25.png"]')).not.toBeNull();
     expect(container.querySelector('img[src$="sprites/9/25.webp"]')).not.toBeNull();
     expect(container.querySelector('img[src$="anim/25.gif"]')).not.toBeNull();
-    expect(label(container)).toBe("Gen I");
+    expect(label(container)).toBe("Gen IX");
     expect(container.querySelectorAll(".sprite-dots span")).toHaveLength(10);
+    expect(activeDot(container)).toBe(8);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/dex\/25\.json$/));
 
     // The entries replace the footer (name and types), not the picture.
@@ -81,26 +82,65 @@ describe("solved card flip", () => {
     expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(true);
   });
 
-  it("pages with the chevrons, and remembers the sprite across flips", async () => {
+  it("opens on the latest generation, pages with the chevrons, and remembers the sprite across flips", async () => {
     const { user, container } = setupSolved("Pikachu");
     await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
-    const prev = screen.getByRole("button", { name: "Previous sprite" }) as HTMLButtonElement;
-    const next = screen.getByRole("button", { name: "Next sprite" });
-    expect(prev.disabled).toBe(true);
+    const prev = screen.getByRole("button", { name: "Previous sprite" });
+    const next = screen.getByRole("button", { name: "Next sprite" }) as HTMLButtonElement;
+    expect(label(container)).toBe("Gen IX");
 
     await user.click(next);
-    await user.click(next);
-    expect(label(container)).toBe("Gen III");
-    expect(activeDot(container)).toBe(2);
+    expect(label(container)).toBe("Animated");
+    expect(next.disabled).toBe(true);
     await user.click(prev);
-    expect(label(container)).toBe("Gen II");
+    await user.click(prev);
+    await user.click(prev);
+    expect(label(container)).toBe("Gen VII");
+    expect(activeDot(container)).toBe(6);
 
-    // Flip back (clicking the sprite), then over again: still on Gen II.
+    // Flip back (clicking the sprite), then over again: still on Gen VII.
     await user.click(screen.getByRole("group", { name: /Pikachu's sprites/ }));
     expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(false);
     await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
-    expect(label(container)).toBe("Gen II");
-    expect(activeDot(container)).toBe(1);
+    expect(label(container)).toBe("Gen VII");
+    expect(activeDot(container)).toBe(6);
+  });
+
+  it("scrolls the entries to the sprite's generation, one way", async () => {
+    const scrollTo = vi.fn();
+    Element.prototype.scrollTo = scrollTo;
+    const { user, container } = setupSolved("Pikachu");
+    await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
+    const region = await screen.findByRole("region", { name: "Pikachu's Pokédex entries" });
+    await within(region).findByRole("heading", { name: "Gen I" });
+    const current = () => region.querySelector(".dex-gen.current")?.getAttribute("data-gen");
+    // The carousel's track scrolls too; only count the entries' own scrolls.
+    const regionScrolls = () => scrollTo.mock.calls.filter((_, i) => scrollTo.mock.contexts[i] === region);
+
+    // Gen IX sprite, but Pikachu has no Gen IX entry: the nearest earlier one.
+    expect(current()).toBe("8");
+    expect(regionScrolls().at(-1)?.[0]).toMatchObject({ behavior: "instant" });
+
+    await user.click(screen.getByRole("button", { name: "Previous sprite" }));
+    await user.click(screen.getByRole("button", { name: "Previous sprite" }));
+    expect(label(container)).toBe("Gen VII");
+    expect(current()).toBe("7");
+    expect(regionScrolls().at(-1)?.[0]).toMatchObject({ behavior: "smooth" });
+
+    // Scrolling the entries leaves the carousel alone.
+    region.scrollTop = 0;
+    region.dispatchEvent(new Event("scroll"));
+    expect(label(container)).toBe("Gen VII");
+
+    // The animated sprite has no generation: the entries stay put.
+    const calls = regionScrolls().length;
+    await user.click(screen.getByRole("button", { name: "Next sprite" }));
+    await user.click(screen.getByRole("button", { name: "Next sprite" }));
+    await user.click(screen.getByRole("button", { name: "Next sprite" }));
+    expect(label(container)).toBe("Animated");
+    expect(current()).toBeUndefined();
+    expect(regionScrolls().length).toBe(calls + 1); // to Gen VIII; IX has no entry; then none
+    delete (Element.prototype as Partial<Element>).scrollTo;
   });
 
   it("works from the keyboard: Enter flips, arrows page, Enter flips back", async () => {
@@ -110,14 +150,14 @@ describe("solved card flip", () => {
     await user.keyboard("{Enter}");
     const track = screen.getByRole("group", { name: /Bulbasaur's sprites/ });
     expect(document.activeElement).toBe(track);
-    await user.keyboard("{ArrowRight}{ArrowRight}{ArrowLeft}");
-    expect(label(container)).toBe("Gen II");
+    await user.keyboard("{ArrowLeft}{ArrowLeft}{ArrowRight}");
+    expect(label(container)).toBe("Gen VIII");
     await user.keyboard("{Enter}");
     expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(false);
     expect(document.activeElement).toBe(front);
   });
 
-  it("starts at the generation the species debuted in", async () => {
+  it("a species with one generation of sprites has no paging", async () => {
     const { user, container } = setupSolved("Pecharunt");
     await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
     expect(label(container)).toBe("Gen IX");

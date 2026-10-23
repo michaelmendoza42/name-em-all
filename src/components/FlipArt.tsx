@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import type { SpriteSlide } from "../lib/sprites";
 import "./flip.css";
 
@@ -8,18 +8,20 @@ interface Props {
   id: number;
   name: string;
   slides: readonly SpriteSlide[];
+  index: number; // the slide showing; kept by the tile so it survives flips
+  onIndex: (index: number) => void;
   flipped: boolean;
   onFlip: () => void;
 }
 
 // A solved tile's image. Clicking it (or Enter/Space) flips the card: the
 // picture turns over to a carousel of the species' sprites, one per
-// generation, while the footer turns over to its Pokédex entries
-// (DexFooter). Swipe, the chevrons or ←/→ move between sprites; the card
-// remembers which one was showing across flips. Sprites only download once
+// generation (opening on the latest), while the footer turns over to its
+// Pokédex entries (DexFooter), which follow the sprite's generation. Swipe,
+// the chevrons or ←/→ move between sprites; the card remembers which one was
+// showing across flips. Sprites only download once
 // the card has been flipped. With no sprites, the artwork stays put.
-export function FlipArt({ id, name, slides, flipped, onFlip }: Props) {
-  const [index, setIndex] = useState(0);
+export function FlipArt({ id, name, slides, index, onIndex, flipped, onFlip }: Props) {
   const frontRef = useRef<HTMLButtonElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const toggled = useRef(false);
@@ -48,12 +50,14 @@ export function FlipArt({ id, name, slides, flipped, onFlip }: Props) {
     const track = trackRef.current;
     const i = Math.max(0, Math.min(slides.length - 1, to));
     track?.scrollTo?.({ left: i * track.clientWidth, behavior: "smooth" });
-    setIndex(i);
+    onIndex(i);
   }
 
   function onScroll() {
     const track = trackRef.current;
-    if (track && track.clientWidth) setIndex(Math.round(track.scrollLeft / track.clientWidth));
+    if (!track?.clientWidth) return;
+    const i = Math.round(track.scrollLeft / track.clientWidth);
+    if (i !== index) onIndex(i);
   }
 
   function onTrackKeyDown(e: KeyboardEvent<HTMLDivElement>) {

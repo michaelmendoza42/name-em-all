@@ -15,7 +15,7 @@ import { normalizeAnswer, type AnswerIndex } from "../lib/answers";
 import { remainingPattern, revealableCount, revealedPrefix, visibleTypes } from "../lib/hints";
 import type { ProgressStore } from "../lib/progress";
 import { focusAndGlide } from "../lib/scroll";
-import { spriteSlides } from "../lib/sprites";
+import { defaultSlide, spriteSlides } from "../lib/sprites";
 import { DexFooter } from "./DexFooter";
 import { FlipArt } from "./FlipArt";
 
@@ -67,6 +67,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
   // Solved cards flip: sprite in the picture, Pokédex entries in the footer.
   const [flipped, setFlipped] = useState(false);
   const slides = useMemo(() => spriteSlides(species), [species]);
+  const [slide, setSlide] = useState(() => defaultSlide(slides));
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const hintsRef = useRef<HTMLDivElement>(null);
@@ -159,6 +160,8 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
           id={id}
           name={name}
           slides={slides}
+          index={slide}
+          onIndex={setSlide}
           flipped={flipped}
           onFlip={() => setFlipped((f) => !f)}
         />
@@ -189,7 +192,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
       {/* Solved and unsolved tiles share one two-row layout so every card is
           the same height: name or input, then types or hint buttons. */}
       {progress.solved ? (
-        <DexFooter id={id} name={name} flipped={flipped}>
+        <DexFooter id={id} name={name} flipped={flipped} generation={slides[slide]?.generation}>
           <p className="name" ref={nameRef} tabIndex={-1}>
             <span className="sr-only">Solved: </span>
             {name}
