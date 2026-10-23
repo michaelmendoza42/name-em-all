@@ -49,6 +49,7 @@ const ANIM_SOURCES = [
 //               white background, flood-filled in from the edges so white
 //               inside the outline stays
 //   webp        re-encode a large PNG as WebP
+// Sets with crop: true also trim still sprites to their visible pixels.
 //
 // Gens I–VI ship as-is (Gen V's animate). Gen VII's animated GIFs average
 // 165 KB (130 MB in all), and Gens VIII–IX are 512px animated renders of
@@ -60,6 +61,7 @@ const SPRITE_SETS = [
     name: "front sprites",
     dir: "sprites",
     field: "sprites",
+    crop: true,
     gens: [
       { gen: 1, ext: "png", sources: ["generation-i/red-blue/transparent"] },
       { gen: 2, ext: "png", sources: ["generation-ii/crystal/transparent"] },
@@ -81,6 +83,7 @@ const SPRITE_SETS = [
     name: "back sprites",
     dir: "sprites/back",
     field: "backSprites",
+    crop: true,
     gens: [
       { gen: 1, ext: "png", whiteToAlpha: true, sources: ["generation-i/red-blue/back"] },
       { gen: 2, ext: "png", whiteToAlpha: true, sources: ["generation-ii/crystal/back"] },
@@ -341,17 +344,39 @@ async function whiteToAlpha(file) {
   return sharp(data, { raw: { width, height, channels: 4 } }).png({ palette: true });
 }
 
-async function prepareSprite(file, spec) {
+// Crops a still sprite to its visible pixels, so it stands on its platform in
+// a battle scene instead of floating in its canvas's empty margin. Animated
+// GIFs ship as-is; theirs are already cropped tight.
+async function cropToContent(file) {
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  let left = width, top = height, right = -1, bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] === 0) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+  if (right < 0 || (left === 0 && top === 0 && right === width - 1 && bottom === height - 1)) return file;
+  const cropped = sharp(file).extract({ left, top, width: right - left + 1, height: bottom - top + 1 });
+  const { format } = await sharp(file).metadata();
+  return (format === "webp" ? cropped.webp({ quality: 80, alphaQuality: 90 }) : cropped.png({ palette: true })).toBuffer();
+}
+
+async function prepareSprite(file, spec, crop) {
+  let out = file;
   if (spec.still?.size) {
-    return sharp(file, { page: 0 })
+    out = await sharp(file, { page: 0 })
       .resize(spec.still.size, spec.still.size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .webp({ quality: 80, alphaQuality: 90 })
       .toBuffer();
-  }
-  if (spec.still) return sharp(file, { page: 0 }).png({ palette: true }).toBuffer();
-  if (spec.whiteToAlpha) return (await whiteToAlpha(file)).toBuffer();
-  if (spec.webp) return sharp(file).webp({ quality: 85, alphaQuality: 90 }).toBuffer();
-  return file;
+  } else if (spec.still) out = await sharp(file, { page: 0 }).png({ palette: true }).toBuffer();
+  else if (spec.whiteToAlpha) out = await (await whiteToAlpha(file)).toBuffer();
+  else if (spec.webp) out = await sharp(file).webp({ quality: 85, alphaQuality: 90 }).toBuffer();
+  return crop && spec.ext !== "gif" ? cropToContent(out) : out;
 }
 
 // Builds one set's files for every generation the species existed in and
@@ -372,7 +397,7 @@ async function buildSpriteSet(entry, set, missing) {
     for (const source of spec.sources) {
       const file = await fetchFile(`${VERSIONS}/${source}/${entry.artworkId}.${spec.from ?? spec.ext}`);
       if (!file) continue;
-      await writeFile(out, await prepareSprite(file, spec));
+      await writeFile(out, await prepareSprite(file, spec, set.crop));
       found = true;
       break;
     }

@@ -15,8 +15,8 @@ interface Props {
 }
 
 // A solved tile's image. Clicking it (or Enter/Space) flips the card: the
-// picture turns over to a carousel of the species' sprites, one per
-// generation (opening on the latest), while the footer turns over to its
+// picture turns over to a carousel of the species' sprites, one battle scene
+// (front and back) per generation (opening on the latest), while the footer turns over to its
 // Pokédex entries (DexFooter), which follow the sprite's generation. Swipe,
 // the chevrons or ←/→ move between sprites; the card remembers which one was
 // showing across flips. Sprites only download once
@@ -126,16 +126,40 @@ export function FlipArt({ id, name, slides, index, onIndex, flipped, onFlip }: P
             onClick={flip}
           >
             {slides.map((s, i) => (
-              <figure key={s.key} className="sprite-slide" aria-hidden={i !== index}>
-                {seen.current && (
-                  <img
-                    src={`${BASE}${s.path}`}
-                    alt={`${name}, ${s.label} sprite`}
-                    className={s.pixelArt ? "pixel" : undefined}
-                    loading="lazy"
-                    draggable={false}
-                  />
-                )}
+              <figure
+                key={s.key}
+                className={`sprite-slide${s.back ? " battle" : ""}${s.pixelArt ? " pixel" : ""}`}
+                aria-hidden={i !== index}
+              >
+                {seen.current &&
+                  (s.back ? (
+                    // Battle scene: the foe's front far off at top right, your
+                    // own Pokémon's back up close at bottom left.
+                    <>
+                      <span className="foe">
+                        <img
+                          src={`${BASE}${s.path}`}
+                          alt={`${name}, ${s.label} front sprite`}
+                          loading="lazy"
+                          draggable={false}
+                        />
+                      </span>
+                      <span className="ally">
+                        <img
+                          src={`${BASE}${s.back.path}`}
+                          alt={`${name}, ${s.label} back sprite`}
+                          loading="lazy"
+                          draggable={false}
+                          onLoad={(e) => {
+                            const img = e.currentTarget;
+                            if (s.back!.scale !== 1) img.style.width = `${img.naturalWidth * s.back!.scale}px`;
+                          }}
+                        />
+                      </span>
+                    </>
+                  ) : (
+                    <img src={`${BASE}${s.path}`} alt={`${name}, ${s.label} sprite`} loading="lazy" draggable={false} />
+                  ))}
               </figure>
             ))}
           </div>

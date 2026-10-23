@@ -18,18 +18,26 @@ export interface SpriteSlide {
   key: string;
   label: string; // "Gen I", or "Animated" for the modern animated sprite
   generation?: number; // undefined for the modern animated sprite
-  path: string; // relative to the app's base URL
+  path: string; // front sprite, relative to the app's base URL
+  back?: { path: string; scale: number }; // back sprite, for a battle scene
   pixelArt: boolean; // render with hard pixel edges
 }
 
-// The slides on a flipped card: the species' sprite from each generation's
-// games, oldest first, then its modern animated sprite when it has one.
-export function spriteSlides(species: Pick<Species, "id" | "sprites" | "animated">): SpriteSlide[] {
+// Gen I stored back sprites at 32px and the games drew them doubled.
+const BACK_SCALE: Record<number, number> = { 1: 2 };
+
+// The slides on a flipped card: the species' sprites from each generation's
+// games, oldest first, front and back together as a battle scene, then its
+// modern animated sprite (front only) when it has one.
+export function spriteSlides(species: Pick<Species, "id" | "sprites" | "backSprites" | "animated">): SpriteSlide[] {
   const slides: SpriteSlide[] = (species.sprites ?? []).map((gen) => ({
     key: `gen-${gen}`,
     generation: gen,
     label: `Gen ${romanGeneration(gen)}`,
     path: frontSpritePath(gen, species.id),
+    back: species.backSprites?.includes(gen)
+      ? { path: backSpritePath(gen, species.id), scale: BACK_SCALE[gen] ?? 1 }
+      : undefined,
     pixelArt: gen <= 7,
   }));
   if (species.animated) {

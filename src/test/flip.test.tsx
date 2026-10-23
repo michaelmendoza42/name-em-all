@@ -63,6 +63,11 @@ describe("solved card flip", () => {
     expect(container.querySelector('img[src$="sprites/1/25.png"]')).not.toBeNull();
     expect(container.querySelector('img[src$="sprites/9/25.webp"]')).not.toBeNull();
     expect(container.querySelector('img[src$="anim/25.gif"]')).not.toBeNull();
+    // Each generation is a battle scene: front sprite as the foe, back sprite as yours.
+    expect(container.querySelector('.battle .foe img[src$="sprites/1/25.png"]')).not.toBeNull();
+    expect(container.querySelector('.battle .ally img[src$="sprites/back/1/25.png"]')).not.toBeNull();
+    expect(container.querySelectorAll(".sprite-slide.battle")).toHaveLength(9);
+    expect(container.querySelector('.sprite-slide:not(.battle) img[src$="anim/25.gif"]')).not.toBeNull();
     expect(label(container)).toBe("Gen IX");
     expect(container.querySelectorAll(".sprite-dots span")).toHaveLength(10);
     expect(activeDot(container)).toBe(8);

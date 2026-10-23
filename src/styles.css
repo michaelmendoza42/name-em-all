@@ -566,9 +566,10 @@ main {
 .type-steel { --type: #b7b7ce; }
 .type-fairy { --type: #d685ad; }
 
-/* Name box plus hint strip. The row's space is always reserved so every
-   card keeps one height. The name box always sits centered between the
-   picture and the card's bottom edge; the hints are a slim strip under it. */
+/* Name box plus hint row. The row's space is always reserved so every card
+   keeps one height, and opening the hints never moves the name box. From
+   the picture down: 11px gap, name box (28px), 12px, hint row (22px), 11px
+   to the card's inner edge. */
 .answer {
   position: relative;
   display: flex;
@@ -577,7 +578,7 @@ main {
 }
 
 .answer .guess {
-  transform: translateY(22px);
+  transform: translateY(5px); /* 6px flex gap + 5px = 11px */
 }
 
 .hints {
@@ -590,17 +591,16 @@ main {
 }
 
 .hints button {
-  height: 16px;
-  /* Sit low, in the card's bottom padding, clear of the name box. */
-  margin-bottom: -5px;
-  padding: 1px 0 0;
+  height: 22px;
+  margin-bottom: 3px;
+  padding: 0;
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));
   color: var(--accent);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 14px;
+  line-height: 20px;
   white-space: nowrap;
   cursor: pointer;
   animation: hint-spread 0.18s ease-out both;
@@ -636,12 +636,12 @@ main {
 /* Hint circle: bottom-right corner of the card, only on the card you're on. */
 .hint-toggle {
   position: absolute;
-  right: -4px;
-  bottom: -5px;
+  right: 0;
+  bottom: 3px;
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
   border-radius: 50%;

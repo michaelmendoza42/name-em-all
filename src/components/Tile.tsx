@@ -182,7 +182,15 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
       done: allLetters,
       label: allLetters ? `All letters revealed for ${label}` : `Reveal Letter for ${label}`,
       title: allLetters ? "All letters revealed" : "Reveal the next letter",
-      onReveal: () => store.revealLetter(id, letterTotal),
+      onReveal: () => {
+        store.revealLetter(id, letterTotal);
+        // The last letter spells the whole name, so there's nothing left to submit.
+        if (store.get(id).letters >= letterTotal) {
+          setJustSolved(true);
+          setHoldFocus(true);
+          store.solve(id);
+        }
+      },
     },
   ];
 

@@ -101,7 +101,7 @@ describe("Tile", () => {
     expect((screen.getByRole("button", { name: `All types revealed for ${label}` }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("Reveal Letter locks one more letter into the input per click and never auto-solves", async () => {
+  it("Reveal Letter locks one more letter into the input per click and solves on the last", async () => {
     const { user, label, container, store } = setup("Mew");
     await openHints(user, label);
     const btn = () => screen.getByRole("button", { name: /letter/i }) as HTMLButtonElement;
@@ -112,15 +112,12 @@ describe("Tile", () => {
     expect(input().placeholder).toBe("__");
     expect(input().value).toBe("");
     await user.click(btn());
-    await user.click(btn());
-    expect(prefix()).toBe("Mew");
-    expect(btn().disabled).toBe(true);
-    expect(btn().getAttribute("aria-label")).toBe(`All letters revealed for ${label}`);
+    expect(prefix()).toBe("Me");
     expect(store.get(151).solved).toBe(false);
-    // Nothing left to type: Enter submits the locked name.
-    await user.click(input());
-    await user.keyboard("{Enter}");
+    // The last letter completes the name: no Enter needed.
+    await user.click(btn());
     expect(store.get(151).solved).toBe(true);
+    expect(screen.getByText("Mew")).toBeTruthy();
   });
 
   it("solves from the locked prefix plus the typed rest, or the full name typed", async () => {

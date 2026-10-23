@@ -111,20 +111,70 @@
   object-fit: contain;
 }
 
-.art.flip .sprite-slide img.pixel {
+.art.flip .sprite-slide.pixel img {
   image-rendering: pixelated;
 }
 
 /* Gens VIII–IX are 192px renders: fit them to the slide. */
-.art.flip .sprite-slide img:not(.pixel) {
+.art.flip .sprite-slide:not(.pixel):not(.battle) img {
   max-width: 82%;
   max-height: 82%;
 }
 
+/* Battle scene, as in the games: the foe's front sprite stands far off at
+   top right, your own Pokémon's back sprite is up close at bottom left, each
+   on an oval platform. Each sprite stands on its box's bottom edge. */
+.sprite-slide.battle {
+  position: relative;
+  display: block;
+  padding: 0;
+}
+
+.sprite-slide.battle .foe,
+.sprite-slide.battle .ally {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.sprite-slide.battle .foe {
+  right: 7%;
+  bottom: 50%;
+  width: 46%;
+  height: 38%;
+}
+
+.sprite-slide.battle .ally {
+  left: 6%;
+  bottom: 14%;
+  width: 50%;
+  height: 44%;
+}
+
+.sprite-slide.battle .foe::before,
+.sprite-slide.battle .ally::before {
+  content: "";
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: -9%;
+  height: 24%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(60 80 100 / 0.22), rgb(60 80 100 / 0.08) 70%, transparent);
+}
+
+.art.flip .sprite-slide.battle img {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Bottom right, where your Pokémon's HP box sits in a battle. */
 .sprite-label {
   position: absolute;
-  top: 8px;
   right: 8px;
+  bottom: 18px;
   padding: 1px 7px;
   border-radius: 999px;
   background: rgb(255 255 255 / 0.85);
