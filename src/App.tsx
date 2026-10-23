@@ -191,29 +191,31 @@ export function GenerationSection({
               {group.region && <span className="region"> · {group.region}</span>}
             </button>
           </h2>
-          <p className="generation-count">
-            {complete && <span aria-hidden="true">✓ </span>}
-            {fmt.format(solved)} / {fmt.format(ids.length)}
-          </p>
-          {complete && iconGens.length > 0 && (
-            <select
-              className="icon-style"
-              aria-label={`Card fronts for ${group.title}`}
-              value={iconGen ?? ""}
-              onChange={(e) => {
-                const next = e.target.value ? Number(e.target.value) : undefined;
-                saveIconStyle(group.generation, next);
-                setIconStyle(next);
-              }}
-            >
-              <option value="">Artwork</option>
-              {iconGens.map((g) => (
-                <option key={g} value={g}>
-                  Gen {romanGeneration(g)} icons
-                </option>
-              ))}
-            </select>
-          )}
+          <div className="generation-meta">
+            <p className="generation-count">
+              {complete && <span aria-hidden="true">✓ </span>}
+              {fmt.format(solved)} / {fmt.format(ids.length)}
+            </p>
+            {complete && iconGens.length > 0 && (
+              <select
+                className="icon-style"
+                aria-label={`Card fronts for ${group.title}`}
+                value={iconGen ?? ""}
+                onChange={(e) => {
+                  const next = e.target.value ? Number(e.target.value) : undefined;
+                  saveIconStyle(group.generation, next);
+                  setIconStyle(next);
+                }}
+              >
+                <option value="">Artwork</option>
+                {iconGens.map((g) => (
+                  <option key={g} value={g}>
+                    Gen {romanGeneration(g)} icons
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
       </header>
       <ol className="wall" id={wallId} start={ids[0]} hidden={collapsed}>

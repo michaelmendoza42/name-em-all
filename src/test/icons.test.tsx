@@ -25,8 +25,8 @@ describe("iconFor", () => {
     expect(iconFor({ id: 906, icons: [9] }, 3)).toMatchObject({ path: "icons/9/906.webp", pixelArt: false });
     expect(iconFor({ id: 1, icons: [] }, 3)).toBeUndefined();
   });
-  it("offers a generation's icon sets from the earliest any of its species has", () => {
-    expect(iconGenerations(gen1.species)).toEqual([3, 4, 5, 6, 7, 8, 9]);
+  it("offers every icon set any of a generation's species has, Gens I–II included", () => {
+    expect(iconGenerations(gen1.species)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 });
 

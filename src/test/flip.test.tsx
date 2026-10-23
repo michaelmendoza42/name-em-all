@@ -227,7 +227,7 @@ describe("sprite files", () => {
       for (const p of paths) expect(existsSync(path.resolve(process.cwd(), "public", p)), p).toBe(true);
     }
     expect(byName("Pikachu").backSprites).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(byName("Pikachu").icons).toEqual([3, 4, 5, 6, 7, 8, 9]);
+    expect(byName("Pikachu").icons).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it("each species' first sprite is from the generation it premiered in", () => {

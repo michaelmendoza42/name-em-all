@@ -57,23 +57,16 @@ export function spriteSlides(
 
 
 // Every generation whose menu icons cover at least one of these species,
-// oldest first. Icons start in Gen III, so Gens I–II have none of their own.
+// oldest first. Gens I–II's are the shared party shapes of Red/Blue and Crystal.
 export function iconGenerations(species: readonly Pick<Species, "icons">[]): number[] {
   return [...new Set(species.flatMap((s) => s.icons ?? []))].sort((a, b) => a - b);
 }
 
 // The species' icon closest to the chosen generation's style: that one, else
 // its latest icon before it, else its earliest after it. Undefined when the
-// Icons are cropped to their visible pixels, so each generation gets a fixed
-// scale: a card's front spans this many of the icon's pixels. A typical icon
-// then fills about 60% of the front whatever its game, and small Pokémon stay
-// smaller than big ones.
-const ICON_SPAN: Record<number, number> = { 3: 36, 4: 36, 5: 36, 6: 38, 7: 38, 8: 50, 9: 240 };
-
 export interface FrontIcon {
   path: string;
   pixelArt: boolean;
-  span: number; // icon pixels across the whole front
 }
 
 // The species' icon closest to the chosen generation's style: that one, else
@@ -84,7 +77,5 @@ export function iconFor(species: Pick<Species, "id" | "icons">, generation: numb
   const gen = gens.includes(generation)
     ? generation
     : (gens.filter((g) => g < generation).at(-1) ?? gens.find((g) => g > generation));
-  return gen === undefined
-    ? undefined
-    : { path: iconPath(gen, species.id), pixelArt: gen <= 8, span: ICON_SPAN[gen] ?? 40 };
+  return gen === undefined ? undefined : { path: iconPath(gen, species.id), pixelArt: gen <= 8 };
 }

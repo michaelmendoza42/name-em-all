@@ -11,8 +11,9 @@
 //                            the in-game sprite from each generation's games
 //                            (swiped through on a flipped card)
 //   public/sprites/back/<gen>/<id>.<ext>, public/icons/<gen>/<id>.<ext>
-//                            the same games' back sprites and menu/box icons
-//                            (downloaded, not shown yet)
+//                            the same games' back sprites and menu/box icons;
+//                            Gens I–II's shared party icons come from the pret
+//                            disassemblies instead (see RETRO_ICONS)
 //   public/dex/<id>.json     English Pokédex entries (flavor text) by
 //                            generation, shown on the back of a flipped card
 //
@@ -429,6 +430,85 @@ async function buildSpriteSet(entry, set, missing) {
   return gens;
 }
 
+// Gens I–II had no per-species icons: the party menu drew one of a few
+// shared shapes by body type (Red/Blue 10, Crystal 38). The pret
+// disassemblies have both the graphics and each species' shape, listed in
+// Pokédex order. Every graphic is a strip of 16px-tall frames; the first
+// frame is used. Red's 8px-wide ones are a left half the game mirrored.
+const PRET = "https://raw.githubusercontent.com/pret";
+const PRET_CACHE = path.join(ROOT, "scripts", ".cache", "pret");
+const RETRO_ICONS = [
+  {
+    gen: 1,
+    repo: "pokered",
+    table: "data/pokemon/menu_icons.asm",
+    // Some shapes borrow an overworld sprite, facing down.
+    graphic: (icon) =>
+      ({
+        MON: "gfx/sprites/monster.png",
+        BALL: "gfx/sprites/poke_ball.png",
+        HELIX: "gfx/sprites/fossil.png",
+        FAIRY: "gfx/sprites/fairy.png",
+        BIRD: "gfx/sprites/bird.png",
+        WATER: "gfx/sprites/seel.png",
+        BUG: "gfx/icons/bug.png",
+        GRASS: "gfx/icons/plant.png",
+        SNAKE: "gfx/icons/snake.png",
+        QUADRUPED: "gfx/icons/quadruped.png",
+      })[icon],
+  },
+  { gen: 2, repo: "pokecrystal", table: "data/pokemon/menu_icons.asm", graphic: (icon) => `gfx/icons/${icon.toLowerCase()}.png` },
+];
+
+async function fetchPret(repo, file) {
+  const cached = path.join(PRET_CACHE, repo, file);
+  if (await exists(cached)) return readFile(cached);
+  const buf = await fetchFile(`${PRET}/${repo}/master/${file}`);
+  if (!buf) throw new Error(`${repo}/${file}: not found`);
+  await mkdir(path.dirname(cached), { recursive: true });
+  await writeFile(cached, buf);
+  return buf;
+}
+
+// The first 16×16 frame of a pret icon graphic, white background cleared.
+async function retroIconFrame(png) {
+  const { data, info } = await sharp(png).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const half = info.width === 8;
+  const out = Buffer.alloc(16 * 16);
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const sx = half && x >= 8 ? 15 - x : x;
+      out[y * 16 + x] = data[y * info.width + sx];
+    }
+  }
+  const frame = await sharp(out, { raw: { width: 16, height: 16, channels: 1 } }).png().toBuffer();
+  return cropToContent(await (await whiteToAlpha(frame)).toBuffer());
+}
+
+// Writes public/icons/<1|2>/<id>.png for every species those games had, and
+// adds the generations to each entry's icons.
+async function buildRetroIcons(entries) {
+  for (const set of RETRO_ICONS) {
+    const dir = path.join(PUBLIC, "icons", String(set.gen));
+    await mkdir(dir, { recursive: true });
+    const table = (await fetchPret(set.repo, set.table)).toString("utf8");
+    const icons = [...table.matchAll(/^\s*(?:db|nybble)\s+ICON_(\w+)/gm)].map((m) => m[1]);
+    const frames = new Map();
+    for (const [i, icon] of icons.entries()) {
+      const entry = entries[i];
+      const out = path.join(dir, `${entry.id}.png`);
+      if (FORCE_IMAGES || !(await exists(out))) {
+        const file = set.graphic(icon);
+        if (!file) throw new Error(`${set.repo}: no graphic for ICON_${icon}`);
+        if (!frames.has(file)) frames.set(file, await retroIconFrame(await fetchPret(set.repo, file)));
+        await writeFile(out, frames.get(file));
+      }
+      entry.icons = [...new Set([set.gen, ...entry.icons])].sort((a, b) => a - b);
+    }
+    console.log(`  Gen ${set.gen} party icons: ${icons.length} species`);
+  }
+}
+
 async function runPool(items, limit, worker) {
   let next = 0;
   let done = 0;
@@ -499,6 +579,7 @@ async function main() {
     console.log(`  ${set.name} by gen — ${counts.join(", ")}`);
   }
 
+  await buildRetroIcons(entries);
   await buildDexEntries(entries);
 
   const dataset = {

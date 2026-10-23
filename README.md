@@ -61,9 +61,12 @@ git archive HEAD | docker build --build-arg REVISION=$(git rev-parse HEAD) -t na
   the same formats (Gens I–II cut from their white backgrounds).
 - **Menu/box icons** (an unlock: once a generation is complete, a picker in its
   header swaps its cards' front artwork for one game's icons, remembered per
-  generation): `public/icons/<gen>/<id>.*` for Gens III–IX (Gen IX's as WebP),
-  cropped to their visible pixels and drawn at one scale per generation. A
-  species missing from the chosen game uses its nearest older icon, else newer.
+  generation): `public/icons/<gen>/<id>.*` for Gens III–IX from PokeAPI/sprites
+  (Gen IX's as WebP), plus Gens I–II's shared party shapes by body type (Red/Blue
+  and Crystal), built from the [pret](https://github.com/pret) disassemblies'
+  graphics and species tables. Cropped to their visible pixels and shown at
+  native size (one icon pixel per CSS pixel; Gen IX's shrink to fit). A species
+  missing from the chosen game uses its nearest older icon, else newer.
 - Each species lists the generations it has as `sprites`, `backSprites` and
   `icons` in `pokedex.json`; paths come from `src/lib/sprites.ts`.
 - **Pokédex entries** (the footer of a flipped solved card): PokéAPI's English flavor

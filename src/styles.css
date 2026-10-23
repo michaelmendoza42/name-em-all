@@ -332,8 +332,19 @@ main {
   transform: rotate(-45deg);
 }
 
+/* Count and icon picker, pushed right; the picker wraps under the count
+   when the bar is too narrow for both. */
+.generation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px 10px;
+  margin-left: auto;
+}
+
 .generation-count {
-  margin: 0 0 0 auto;
+  margin: 0;
   white-space: nowrap;
   font-size: 22px;
   line-height: 1;
@@ -345,7 +356,6 @@ main {
 .icon-style {
   position: relative;
   z-index: 1;
-  margin-left: auto;
   padding: 1px 4px;
   font: inherit;
   font-size: 18px;

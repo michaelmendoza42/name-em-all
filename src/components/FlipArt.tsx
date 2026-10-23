@@ -82,7 +82,6 @@ export function FlipArt({ id, name, icon, slides, index, onIndex, flipped, onFli
       alt={name}
       width={256}
       height={256}
-      onLoad={icon ? (e) => sizeIcon(e.currentTarget, icon.span) : undefined}
       loading="lazy"
       decoding="async"
       draggable={false}
@@ -203,14 +202,6 @@ export function FlipArt({ id, name, icon, slides, index, onIndex, flipped, onFli
       </div>
     </div>
   );
-}
-
-// Draws an icon at its generation's scale, shrunk to fit if it's bigger than the front.
-function sizeIcon(img: HTMLImageElement, span: number) {
-  const { naturalWidth: w, naturalHeight: h } = img;
-  const fit = Math.min(1, span / Math.max(w, h));
-  img.style.width = `${(w / span) * fit * 100}%`;
-  img.style.height = `${(h / span) * fit * 100}%`;
 }
 
 function Chevron({ d }: { d: string }) {
