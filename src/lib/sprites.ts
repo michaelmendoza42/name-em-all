@@ -28,8 +28,11 @@ const BACK_SCALE: Record<number, number> = { 1: 2 };
 
 // The slides on a flipped card: the species' sprites from each generation's
 // games, oldest first, front and back together as a battle scene, then its
-// modern animated sprite (front only) when it has one.
-export function spriteSlides(species: Pick<Species, "id" | "sprites" | "backSprites" | "animated">): SpriteSlide[] {
+// modern animated sprite when it has one, as a battle scene too when there's
+// an animated back to go with it.
+export function spriteSlides(
+  species: Pick<Species, "id" | "sprites" | "backSprites" | "animated" | "animatedBack">,
+): SpriteSlide[] {
   const slides: SpriteSlide[] = (species.sprites ?? []).map((gen) => ({
     key: `gen-${gen}`,
     generation: gen,
@@ -41,7 +44,13 @@ export function spriteSlides(species: Pick<Species, "id" | "sprites" | "backSpri
     pixelArt: gen <= 7,
   }));
   if (species.animated) {
-    slides.push({ key: "anim", label: "Animated", path: `anim/${species.id}.gif`, pixelArt: true });
+    slides.push({
+      key: "anim",
+      label: "Animated",
+      path: `anim/${species.id}.gif`,
+      back: species.animatedBack ? { path: `anim/back/${species.id}.gif`, scale: 1 } : undefined,
+      pixelArt: true,
+    });
   }
   return slides;
 }

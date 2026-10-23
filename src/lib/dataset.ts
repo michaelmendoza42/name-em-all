@@ -5,6 +5,7 @@ export interface Species {
   generation: number;
   types: readonly string[];
   animated?: boolean; // has public/anim/<id>.gif, distinct from its Gen V sprite
+  animatedBack?: boolean; // has public/anim/back/<id>.gif to go with it
   sprites?: readonly number[]; // generations with public/sprites/<gen>/<id>.*
   backSprites?: readonly number[]; // generations with public/sprites/back/<gen>/<id>.*
   icons?: readonly number[]; // generations with a menu/box icon, public/icons/<gen>/<id>.*

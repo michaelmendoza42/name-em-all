@@ -66,8 +66,10 @@ describe("solved card flip", () => {
     // Each generation is a battle scene: front sprite as the foe, back sprite as yours.
     expect(container.querySelector('.battle .foe img[src$="sprites/1/25.png"]')).not.toBeNull();
     expect(container.querySelector('.battle .ally img[src$="sprites/back/1/25.png"]')).not.toBeNull();
-    expect(container.querySelectorAll(".sprite-slide.battle")).toHaveLength(9);
-    expect(container.querySelector('.sprite-slide:not(.battle) img[src$="anim/25.gif"]')).not.toBeNull();
+    // The animated sprite too, with its animated back.
+    expect(container.querySelectorAll(".sprite-slide.battle")).toHaveLength(10);
+    expect(container.querySelector('.battle .foe img[src$="anim/25.gif"]')).not.toBeNull();
+    expect(container.querySelector('.battle .ally img[src$="anim/back/25.gif"]')).not.toBeNull();
     expect(label(container)).toBe("Gen I");
     expect(container.querySelectorAll(".sprite-dots span")).toHaveLength(10);
     expect(activeDot(container)).toBe(0);
@@ -209,7 +211,9 @@ describe("sprite files", () => {
   it("every listed sprite exists on disk", () => {
     for (const s of dataset.species) {
       for (const slide of spriteSlides(s)) {
-        expect(existsSync(path.resolve(process.cwd(), "public", slide.path)), slide.path).toBe(true);
+        for (const p of [slide.path, slide.back?.path]) {
+          if (p) expect(existsSync(path.resolve(process.cwd(), "public", p)), p).toBe(true);
+        }
       }
     }
   });
