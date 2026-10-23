@@ -16,7 +16,7 @@ interface Props {
 
 // A solved tile's image. Clicking it (or Enter/Space) flips the card: the
 // picture turns over to a carousel of the species' sprites, one battle scene
-// (front and back) per generation (opening on the latest), while the footer turns over to its
+// (front and back) per generation (opening on the one it premiered in), while the footer turns over to its
 // Pokédex entries (DexFooter), which follow the sprite's generation. Swipe,
 // the chevrons or ←/→ move between sprites (the chevrons and arrows wrap
 // around from the last to the first and back); the card remembers which one was
