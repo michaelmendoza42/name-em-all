@@ -47,9 +47,9 @@ describe("answer index", () => {
     expect(ok("Mime Jr.", "Mime Junior")).toBe(true);
   });
 
-  it("rejects ambiguous answers", () => {
-    expect(ok("Nidoran♀", "Nidoran")).toBe(false);
-    expect(ok("Nidoran♂", "Nidoran")).toBe(false);
+  it("accepts a name without its ♀/♂ symbol on that species' own tile", () => {
+    expect(ok("Nidoran♀", "Nidoran")).toBe(true);
+    expect(ok("Nidoran♂", "nidoran")).toBe(true);
   });
 
   it("rejects another species' name and near misses (no fuzzy matching)", () => {

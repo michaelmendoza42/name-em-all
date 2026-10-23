@@ -21,14 +21,18 @@ export interface AnswerIndex {
 }
 
 // Every accepted key maps to the species it names. A key claimed by more than
-// one species is ambiguous and accepted for none of them.
+// one species is ambiguous and accepted for none of them, with one exception:
+// a species' own name without its ♀/♂ symbol ("Nidoran") is always accepted on
+// its own tile, since the tile already says which one it is.
 export function buildAnswerIndex(
   species: readonly Pick<Species, "id" | "slug" | "name">[],
   aliases: Readonly<Record<string, readonly string[]>> = ALIASES,
 ): AnswerIndex {
   const owners = new Map<string, Set<number>>();
   const keysById = new Map<number, string[]>();
+  const bareNameById = new Map<number, string>();
   for (const s of species) {
+    bareNameById.set(s.id, normalizeAnswer(s.name.replace(/[♀♂]/g, "")));
     for (const raw of [s.name, s.slug, ...(aliases[s.slug] ?? [])]) {
       const key = normalizeAnswer(raw);
       if (!key) continue;
@@ -40,7 +44,9 @@ export function buildAnswerIndex(
   }
   return {
     isCorrect(speciesId, guess) {
-      const ids = owners.get(normalizeAnswer(guess));
+      const key = normalizeAnswer(guess);
+      if (key && key === bareNameById.get(speciesId)) return true;
+      const ids = owners.get(key);
       return ids !== undefined && ids.size === 1 && ids.has(speciesId);
     },
     isExtendable(speciesId, guess) {
