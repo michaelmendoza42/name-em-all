@@ -6,6 +6,8 @@
 //   public/sil/<id>.webp     solid black silhouette cut from the same artwork
 //   public/anim/<id>.gif     animated sprite (shown when a solved card flips),
 //                            where one exists
+//   public/dex/<id>.json     English Pokédex entries (flavor text) by
+//                            generation, shown on the back of a flipped card
 //
 // Re-run with `npm run data`. Downloads are cached in scripts/.cache, so
 // re-runs only fetch what's missing. Pass --force-images to rebuild images.
@@ -47,16 +49,85 @@ const QUERY = `{
   }
 }`;
 
-async function fetchSpecies() {
-  const res = await fetch(GRAPHQL, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: QUERY }),
-  });
+const FLAVOR_QUERY = `{
+  pokemonspeciesflavortext(
+    where: { language_id: { _eq: ${ENGLISH} } }
+    order_by: [{ pokemon_species_id: asc }, { version_id: asc }]
+  ) {
+    pokemon_species_id
+    flavor_text
+    version {
+      name
+      versionnames(where: { language_id: { _eq: ${ENGLISH} } }) { name }
+      versiongroup { generation_id }
+    }
+  }
+}`;
+
+// Retries the gateway errors (5xx) PokéAPI's GraphQL endpoint throws under load.
+async function graphql(query) {
+  let res;
+  for (let attempt = 1; ; attempt++) {
+    res = await fetch(GRAPHQL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    if (res.ok || res.status < 500 || attempt >= 6) break;
+    await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+  }
   if (!res.ok) throw new Error(`PokéAPI GraphQL returned ${res.status}`);
   const body = await res.json();
   if (body.errors) throw new Error(`PokéAPI GraphQL errors: ${JSON.stringify(body.errors)}`);
   return body.data;
+}
+
+const fetchSpecies = () => graphql(QUERY);
+
+// Game text is laid out for small screens: hard line breaks, page breaks
+// (\f), soft hyphens at line ends, and Gens 1–3 shout names in capitals.
+// Flow it into plain sentences and write names the modern way.
+function cleanFlavorText(text, capsNames) {
+  return text
+    .replace(/\u00ad\s*/g, "")
+    .replace(/[\f\n\r]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/POK[ÉéE]MON/g, "Pokémon")
+    .replace(/POK[ÉéE] ?BALL/g, "Poké Ball")
+    .replace(/\bMR\. MIME\b|\bMIME JR\.|\b[A-Z]{3,}(?:['’][A-Z]+\b)?/g, (w) => capsNames.get(w.replace(/’/g, "'")) ?? w)
+    .trim();
+}
+
+// One file per species: its entries grouped by the generation of the game
+// they appeared in, oldest first. Games in the same generation that share a
+// text (Red and Blue, X and Y) collapse into one entry listing both.
+async function buildDexEntries(entries) {
+  await mkdir(path.join(PUBLIC, "dex"), { recursive: true });
+  // Capitalized names to rewrite, e.g. PIKACHU, FARFETCH'D, MR. MIME. Other
+  // capitals (move names like TACKLE, BERRIES) are left as the games wrote them.
+  const capsNames = new Map(entries.map((e) => [e.name.toUpperCase().replace(/’/g, "'"), e.name]));
+  capsNames.set("NIDORAN", "Nidoran");
+  const rows = (await graphql(FLAVOR_QUERY)).pokemonspeciesflavortext;
+  const bySpecies = new Map();
+  for (const r of rows) {
+    const generation = r.version.versiongroup.generation_id;
+    const version = r.version.versionnames[0]?.name ?? r.version.name;
+    const text = cleanFlavorText(r.flavor_text, capsNames);
+    if (!text) continue;
+    const list = bySpecies.get(r.pokemon_species_id) ?? [];
+    bySpecies.set(r.pokemon_species_id, list);
+    const same = list.find((x) => x.generation === generation && x.text === text);
+    if (same) same.versions.push(version);
+    else list.push({ generation, versions: [version], text });
+  }
+  const missing = [];
+  for (const e of entries) {
+    const list = (bySpecies.get(e.id) ?? []).sort((a, b) => a.generation - b.generation);
+    if (!list.length) missing.push(e.id);
+    await writeFile(path.join(PUBLIC, "dex", `${e.id}.json`), JSON.stringify(list) + "\n");
+  }
+  console.log(`  Pokédex entries: ${rows.length} texts for ${entries.length - missing.length}/${entries.length} species`);
+  if (missing.length) console.log(`  no Pokédex entries for #${missing.join(", #")}`);
 }
 
 function toEntries(data) {
@@ -186,6 +257,8 @@ async function main() {
   const missing = entries.filter((e) => !e.animated).map((e) => e.id);
   console.log(`  animated sprites: ${entries.length - missing.length}/${entries.length}`);
   if (missing.length) console.log(`  no animation for #${missing.join(", #")}`);
+
+  await buildDexEntries(entries);
 
   const dataset = {
     source: "PokéAPI (graphql.pokeapi.co) + PokeAPI/sprites official artwork",

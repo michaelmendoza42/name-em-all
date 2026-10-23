@@ -1,16 +1,10 @@
-/* Solved-card flip: artwork on the front, animated sprite on the back. */
+/* Solved-card flip: artwork on the front; on the back, the animated sprite
+   above the species' Pokédex entries. */
 
 .art.flip {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
   overflow: visible;
   perspective: 900px;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
+  background: none;
 }
 
 .flip-inner {
@@ -29,8 +23,6 @@
 .flip-face {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
   border-radius: 8px;
   background: var(--stage);
   overflow: hidden;
@@ -38,15 +30,38 @@
   -webkit-backface-visibility: hidden;
 }
 
+.flip-front {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
 .flip-back {
   transform: rotateY(180deg);
+  display: grid;
+  grid-template-rows: 40% minmax(0, 1fr);
+}
+
+.flip-sprite {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 4px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
 }
 
 /* Animated sprites are pixel art: show them at their natural size, centered,
-   never scaled up (only down if one is bigger than the card). Pixelated
+   never scaled up (only down if one is bigger than the band). Pixelated
    rendering keeps edges hard on high-DPI screens. The doubled class beats
    styles.css's general `.art img` fill rule, which loads later. */
-.art.flip .flip-back img {
+.art.flip .flip-sprite img {
   display: block;
   width: auto;
   height: auto;
@@ -57,8 +72,69 @@
   image-rendering: pixelated;
 }
 
-.art.flip:focus-visible {
-  border-radius: 8px;
+/* No animation: the artwork, small, in the sprite's place. */
+.art.flip .flip-sprite img.still {
+  height: 100%;
+  image-rendering: auto;
+}
+
+/* The stage is light in both themes, so the entries keep dark text. */
+.dex-entries {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 8px 8px;
+  border-top: 1px solid rgb(0 0 0 / 0.1);
+  color: #16191d;
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: auto;
+  user-select: text;
+  scrollbar-width: thin;
+}
+
+.dex-gen h3 {
+  position: sticky;
+  top: 0;
+  margin: 0 -8px;
+  padding: 5px 8px 2px;
+  background: #e6eaef;
+  color: #4a535e;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dex-gen p {
+  margin: 0 0 6px;
+}
+
+.dex-games {
+  font-weight: 700;
+  color: #3a424c;
+}
+
+.dex-status {
+  margin: 8px 0;
+  color: #4a535e;
+}
+
+.dex-retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1f6feb;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.flip-front:focus-visible,
+.flip-sprite:focus-visible,
+.dex-entries:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus);
 }
 
 @media (prefers-reduced-motion: reduce) {

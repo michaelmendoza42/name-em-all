@@ -16,6 +16,8 @@ const REGIONS: Record<number, string> = {
 
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
 
+export const romanGeneration = (generation: number) => ROMAN[generation] ?? String(generation);
+
 export interface GenerationGroup {
   generation: number;
   title: string; // "Generation I"
@@ -31,7 +33,7 @@ export function groupByGeneration(species: readonly Species[]): GenerationGroup[
     if (!group || group.generation !== s.generation) {
       group = {
         generation: s.generation,
-        title: `Generation ${ROMAN[s.generation] ?? s.generation}`,
+        title: `Generation ${romanGeneration(s.generation)}`,
         region: REGIONS[s.generation],
         species: [],
       };
