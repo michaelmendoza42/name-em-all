@@ -1,10 +1,22 @@
-/* Solved-card flip: artwork on the front; on the back, the animated sprite
-   above the species' Pokédex entries. */
+/* Solved-card flip. The picture turns over to the animated sprite and the
+   footer (name and types) turns over to the Pokédex entries, in step, so the
+   card keeps its size and the picture stays a picture. */
 
 .art.flip {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
   overflow: visible;
   perspective: 900px;
-  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.foot.flip {
+  perspective: 900px;
 }
 
 .flip-inner {
@@ -16,52 +28,47 @@
   transition: transform 520ms cubic-bezier(0.3, 0.7, 0.3, 1);
 }
 
-.flip.flipped .flip-inner {
+/* A species without an animated sprite keeps its artwork; only the footer turns. */
+.art.flip.animated.flipped .flip-inner,
+.foot.flip.flipped .flip-inner {
   transform: rotateY(180deg);
+}
+
+.flip-face,
+.foot-front {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .flip-face {
   position: absolute;
   inset: 0;
+}
+
+.art .flip-face {
+  display: grid;
+  place-items: center;
   border-radius: 8px;
   background: var(--stage);
   overflow: hidden;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.flip-front {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
 }
 
 .flip-back {
   transform: rotateY(180deg);
-  display: grid;
-  grid-template-rows: 40% minmax(0, 1fr);
 }
 
-.flip-sprite {
-  display: grid;
-  place-items: center;
-  min-height: 0;
-  padding: 4px;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  overflow: hidden;
+/* The footer's front stays in the flow, so it sets the footer's height. */
+.foot-front {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 /* Animated sprites are pixel art: show them at their natural size, centered,
-   never scaled up (only down if one is bigger than the band). Pixelated
+   never scaled up (only down if one is bigger than the card). Pixelated
    rendering keeps edges hard on high-DPI screens. The doubled class beats
    styles.css's general `.art img` fill rule, which loads later. */
-.art.flip .flip-sprite img {
+.art.flip .flip-back img {
   display: block;
   width: auto;
   height: auto;
@@ -72,34 +79,28 @@
   image-rendering: pixelated;
 }
 
-/* No animation: the artwork, small, in the sprite's place. */
-.art.flip .flip-sprite img.still {
-  height: 100%;
-  image-rendering: auto;
+.art.flip:focus-visible {
+  border-radius: 8px;
 }
 
-/* The stage is light in both themes, so the entries keep dark text. */
 .dex-entries {
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 8px 8px;
-  border-top: 1px solid rgb(0 0 0 / 0.1);
-  color: #16191d;
+  padding: 0 4px 4px;
+  border-radius: 6px;
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.35;
   text-align: left;
-  cursor: auto;
-  user-select: text;
   scrollbar-width: thin;
 }
 
 .dex-gen h3 {
   position: sticky;
   top: 0;
-  margin: 0 -8px;
-  padding: 5px 8px 2px;
-  background: #e6eaef;
-  color: #4a535e;
+  margin: 0 -4px;
+  padding: 2px 4px 1px;
+  background: var(--solved-bg);
+  color: var(--solved);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -107,34 +108,27 @@
 }
 
 .dex-gen p {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
 }
 
 .dex-games {
   font-weight: 700;
-  color: #3a424c;
+  color: var(--muted);
 }
 
 .dex-status {
-  margin: 8px 0;
-  color: #4a535e;
+  margin: 4px 0;
+  color: var(--muted);
 }
 
 .dex-retry {
   padding: 0;
   border: 0;
   background: none;
-  color: #1f6feb;
+  color: var(--accent);
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
-}
-
-.flip-front:focus-visible,
-.flip-sprite:focus-visible,
-.dex-entries:focus-visible {
-  outline: none;
-  box-shadow: inset var(--focus);
 }
 
 @media (prefers-reduced-motion: reduce) {

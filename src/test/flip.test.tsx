@@ -45,19 +45,24 @@ describe("solved card flip", () => {
     expect(byName("Pecharunt").animated).toBe(false);
   });
 
-  it("flips to the animated sprite and Pokédex entries, loading them only then, and back again", async () => {
+  it("flips the picture to the sprite and the footer to Pokédex entries, loading them only then, and back", async () => {
     const { user, container } = setupSolved("Pikachu");
-    const front = screen.getByRole("button", { name: "Flip card to see Pikachu's Pokédex entries" });
+    const card = screen.getByRole("button", { name: "Flip card to see Pikachu's Pokédex entries" });
+    expect(card.getAttribute("aria-pressed")).toBe("false");
     expect(container.querySelector('img[src$="anim/25.gif"]')).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
 
-    await user.click(front);
-    const card = container.querySelector(".flip")!;
+    await user.click(card);
+    expect(card.getAttribute("aria-pressed")).toBe("true");
     expect(card.classList.contains("flipped")).toBe(true);
+    expect(container.querySelector(".foot")!.classList.contains("flipped")).toBe(true);
     expect(container.querySelector('img[src$="anim/25.gif"]')).not.toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/dex\/25\.json$/));
 
+    // The entries replace the footer (name and types), not the picture.
     const region = await screen.findByRole("region", { name: "Pikachu's Pokédex entries" });
+    expect(region.closest(".foot")).not.toBeNull();
+    expect(region.closest(".art")).toBeNull();
     expect(await within(region).findByRole("heading", { name: "Gen I" })).toBeTruthy();
     expect(within(region).getByRole("heading", { name: "Gen VIII" })).toBeTruthy();
     expect(region.textContent).toContain("Red · Blue");
@@ -65,27 +70,31 @@ describe("solved card flip", () => {
 
     // Clicking inside the entries (to scroll or select) keeps the card flipped.
     await user.click(region);
-    expect(card.classList.contains("flipped")).toBe(true);
+    expect(card.getAttribute("aria-pressed")).toBe("true");
 
-    await user.click(screen.getByRole("button", { name: "Flip Pikachu's card back" }));
-    expect(card.classList.contains("flipped")).toBe(false);
+    await user.click(card);
+    expect(card.getAttribute("aria-pressed")).toBe("false");
+    expect(container.querySelector(".foot")!.classList.contains("flipped")).toBe(false);
+    // The sprite stays loaded so it's visible while turning back.
+    expect(container.querySelector('img[src$="anim/25.gif"]')).not.toBeNull();
   });
 
-  it("flips from the keyboard, keeping focus on the visible face", async () => {
+  it("flips from the keyboard", async () => {
     const { user } = setupSolved("Bulbasaur");
-    const front = screen.getByRole("button", { name: /Flip card to see/ });
-    front.focus();
+    const card = screen.getByRole("button", { name: /Flip card to see/ });
+    card.focus();
     await user.keyboard("{Enter}");
-    const back = screen.getByRole("button", { name: "Flip Bulbasaur's card back" });
-    expect(document.activeElement).toBe(back);
+    expect(card.getAttribute("aria-pressed")).toBe("true");
     await user.keyboard(" ");
-    expect(document.activeElement).toBe(front);
+    expect(card.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("flips to the still artwork plus entries when no animated sprite exists", async () => {
+  it("keeps the artwork and still shows entries when no animated sprite exists", async () => {
     const { user, container } = setupSolved("Pecharunt");
-    await user.click(screen.getByRole("button", { name: /Flip card to see Pecharunt/ }));
-    expect(container.querySelector('.flip-sprite img[src$="art/1025.webp"]')).not.toBeNull();
+    const card = screen.getByRole("button", { name: /Flip card to see Pecharunt/ });
+    await user.click(card);
+    expect(card.classList.contains("animated")).toBe(false);
+    expect(container.querySelector(".flip-back img")).toBeNull();
     const region = await screen.findByRole("region", { name: "Pecharunt's Pokédex entries" });
     expect(await within(region).findByRole("heading", { name: "Gen IX" })).toBeTruthy();
   });

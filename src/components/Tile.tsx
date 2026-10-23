@@ -15,6 +15,7 @@ import { normalizeAnswer, type AnswerIndex } from "../lib/answers";
 import { remainingPattern, revealableCount, revealedPrefix, visibleTypes } from "../lib/hints";
 import type { ProgressStore } from "../lib/progress";
 import { focusAndGlide } from "../lib/scroll";
+import { DexFooter } from "./DexFooter";
 import { FlipArt } from "./FlipArt";
 
 const BASE = import.meta.env.BASE_URL;
@@ -62,6 +63,8 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
   const [justSolved, setJustSolved] = useState(false);
   // Set when a solve should keep focus on this tile instead of advancing.
   const [holdFocus, setHoldFocus] = useState(false);
+  // Solved cards flip: sprite in the picture, Pokédex entries in the footer.
+  const [flipped, setFlipped] = useState(false);
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const hintsRef = useRef<HTMLDivElement>(null);
@@ -150,7 +153,13 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
     <li className={`tile${progress.solved ? " solved" : ""}${justSolved ? " just-solved" : ""}`}>
       <span className="dex">{number}</span>
       {progress.solved ? (
-        <FlipArt id={id} name={name} animated={species.animated === true} />
+        <FlipArt
+          id={id}
+          name={name}
+          animated={species.animated === true}
+          flipped={flipped}
+          onFlip={() => setFlipped((f) => !f)}
+        />
       ) : (
         <div className="art">
           <img
@@ -178,7 +187,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
       {/* Solved and unsolved tiles share one two-row layout so every card is
           the same height: name or input, then types or hint buttons. */}
       {progress.solved ? (
-        <>
+        <DexFooter id={id} name={name} flipped={flipped}>
           <p className="name" ref={nameRef} tabIndex={-1}>
             <span className="sr-only">Solved: </span>
             {name}
@@ -190,7 +199,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
               </span>
             ))}
           </div>
-        </>
+        </DexFooter>
       ) : (
         <>
           {/* Clicking anywhere in the box (including the locked letters) focuses the input. */}

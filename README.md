@@ -49,7 +49,7 @@ git archive HEAD | docker build --build-arg REVISION=$(git rev-parse HEAD) -t na
 - **Artwork**: PokeAPI/sprites official artwork, resized to 256×256 WebP (`public/art`).
 - **Silhouettes**: cut from the same artwork by keeping only its alpha channel
   and painting it black (`public/sil`), so silhouette files contain no color or detail.
-- **Pokédex entries** (back of a flipped solved card): PokéAPI's English flavor
+- **Pokédex entries** (the footer of a flipped solved card, under the sprite): PokéAPI's English flavor
   text, one file per species (`public/dex/<id>.json`, fetched on first flip),
   grouped by the generation of the game. Line breaks and soft hyphens are
   flowed into sentences, old all-caps names (PIKACHU, POKéMON) are written the
