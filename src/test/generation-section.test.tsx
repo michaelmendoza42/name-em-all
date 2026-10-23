@@ -14,7 +14,7 @@ afterEach(cleanup);
 describe("GenerationSection", () => {
   it("highlights the header only once every Pokémon in the generation is solved", () => {
     const store = new ProgressStore(new MemoryStorage());
-    const { container } = render(<GenerationSection group={gen1} store={store} answers={answers} />);
+    const { container } = render(<GenerationSection group={gen1} store={store} answers={answers} iconStyles={[]} />);
     const head = () => container.querySelector(".generation-head")!;
     const [last, ...rest] = gen1.species.map((s) => s.id).reverse();
     act(() => rest.forEach((id) => store.solve(id)));
@@ -27,7 +27,7 @@ describe("GenerationSection", () => {
 describe("GenerationSection collapse", () => {
   it("hides the generation's Pokémon and takes them out of keyboard order", () => {
     const store = new ProgressStore(new MemoryStorage());
-    const { container, getByRole } = render(<GenerationSection group={gen1} store={store} answers={answers} />);
+    const { container, getByRole } = render(<GenerationSection group={gen1} store={store} answers={answers} iconStyles={[]} />);
     const toggle = getByRole("button", { expanded: true });
     const wall = container.querySelector("ol")!;
     expect(toggle.getAttribute("aria-controls")).toBe(wall.id);
@@ -42,14 +42,14 @@ describe("GenerationSection collapse", () => {
 
   it("restores a collapsed generation after a reload", () => {
     const store = new ProgressStore(new MemoryStorage());
-    const first = render(<GenerationSection group={gen1} store={store} answers={answers} />);
+    const first = render(<GenerationSection group={gen1} store={store} answers={answers} iconStyles={[]} />);
     act(() => first.getByRole("button", { expanded: true }).click());
     first.unmount();
-    const { container } = render(<GenerationSection group={gen1} store={store} answers={answers} />);
+    const { container } = render(<GenerationSection group={gen1} store={store} answers={answers} iconStyles={[]} />);
     expect(container.querySelector("ol")!.hidden).toBe(true);
     act(() => void container.querySelector<HTMLButtonElement>(".collapse-toggle")!.click());
     cleanup();
-    const again = render(<GenerationSection group={gen1} store={store} answers={answers} />);
+    const again = render(<GenerationSection group={gen1} store={store} answers={answers} iconStyles={[]} />);
     expect(again.container.querySelector("ol")!.hidden).toBe(false);
   });
 });
@@ -62,7 +62,7 @@ describe("JumpToNext", () => {
     const store = new ProgressStore(new MemoryStorage());
     const { container } = render(
       <>
-        <GenerationSection group={gen1} store={store} answers={answers} />
+        <GenerationSection group={gen1} store={store} answers={answers} iconStyles={[]} />
         <JumpToNext />
       </>,
     );

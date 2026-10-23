@@ -140,6 +140,31 @@ input {
   color: var(--muted);
 }
 
+/* Dev-server-only generation toggles (DevTools). */
+.dev-tools {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.dev-gens {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.bar .dev-gens button {
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.bar .dev-gens button[aria-pressed="true"] {
+  background: var(--solved-bg);
+  border-color: var(--solved);
+  color: var(--solved);
+}
+
 .bar .menu-item {
   width: 100%;
   text-align: left;
@@ -249,6 +274,8 @@ main {
   padding: 7px 12px 6px;
   overflow: hidden;
   font-family: "VT323", ui-monospace, monospace;
+  /* VT323's spaces are a full monospace cell; tighten "151 / 151", "I · Kanto". */
+  word-spacing: -0.25em;
   color: var(--gba-ink);
   text-shadow: 1px 1px 0 var(--gba-ink-shadow);
   background: var(--gba-panel);
@@ -287,6 +314,20 @@ main {
 
 .generation-head .region {
   font-weight: 400;
+}
+
+.gen-short {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .gen-long {
+    display: none;
+  }
+
+  .gen-short {
+    display: inline;
+  }
 }
 
 .collapse-toggle {
@@ -332,8 +373,7 @@ main {
   transform: rotate(-45deg);
 }
 
-/* Count and icon picker, pushed right; the picker wraps under the count
-   when the bar is too narrow for both. */
+/* Count and icon picker, pushed right. */
 .generation-meta {
   display: flex;
   flex-wrap: wrap;
@@ -349,27 +389,6 @@ main {
   font-size: 22px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-}
-
-/* Unlocked by completing the generation: what its cards show on the front.
-   Sits above the header's stretched collapse button. */
-.icon-style {
-  position: relative;
-  z-index: 1;
-  padding: 1px 4px;
-  font: inherit;
-  font-size: 18px;
-  line-height: 1;
-  color: var(--gba-ink);
-  background: var(--gba-panel);
-  border: 2px solid var(--gba-frame);
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.icon-style:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 /* Full bar: a quick level-up flash. */

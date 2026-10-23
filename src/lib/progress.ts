@@ -134,6 +134,19 @@ export class ProgressStore {
     this.all.forEach((l) => l());
   }
 
+  // Drops all progress (solve and hints) for these ids; one save and one
+  // notification round. Used by the dev tools.
+  forgetMany(ids: readonly number[]) {
+    const changed = ids.filter((id) => id in this.map);
+    if (changed.length === 0) return;
+    const next = { ...this.map };
+    for (const id of changed) delete next[id];
+    this.map = next;
+    this.write();
+    for (const id of changed) this.byId.get(id)?.forEach((l) => l());
+    this.all.forEach((l) => l());
+  }
+
   revealArtwork(id: number) {
     const cur = this.get(id);
     if (!cur.artwork) this.set(id, { ...cur, artwork: true });

@@ -80,10 +80,15 @@ export interface FrontIcon {
 }
 
 // The species' icon closest to the chosen generation's style: that one, else
-// its latest icon before it, else its earliest after it. Undefined when the
-// species has no icons at all. Icons are pixel art up to Gen VIII.
-export function iconFor(species: Pick<Species, "id" | "icons">, generation: number): FrontIcon | undefined {
-  const gens = species.icons ?? [];
+// its latest icon before it, else its earliest after it, choosing only among
+// `allowed` generations when given. Undefined when there's none to show.
+// Icons are pixel art up to Gen VIII.
+export function iconFor(
+  species: Pick<Species, "id" | "icons">,
+  generation: number,
+  allowed?: readonly number[],
+): FrontIcon | undefined {
+  const gens = (species.icons ?? []).filter((g) => !allowed || allowed.includes(g));
   const gen = gens.includes(generation)
     ? generation
     : (gens.filter((g) => g < generation).at(-1) ?? gens.find((g) => g > generation));

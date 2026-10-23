@@ -15,10 +15,12 @@ import { buildAnswerIndex, type AnswerIndex } from "./lib/answers";
 import { loadDataset, type Dataset } from "./lib/dataset";
 import { groupByGeneration, romanGeneration, type GenerationGroup } from "./lib/generations";
 import { isCollapsed, setCollapsed as saveCollapsed } from "./lib/collapsed";
-import { getIconStyle, setIconStyle as saveIconStyle } from "./lib/iconStyle";
+import { getIconStyle, setIconStyle as saveIconStyle, unlockedIconStyles } from "./lib/iconStyle";
 import { STORAGE_KEY, type ProgressStore } from "./lib/progress";
 import { focusAndGlide, isGliding } from "./lib/scroll";
 import { iconGenerations } from "./lib/sprites";
+import { DevTools } from "./components/DevTools";
+import { IconStylePicker } from "./components/IconStylePicker";
 import { guessInputs, Tile } from "./components/Tile";
 
 const DATA_URL = `${import.meta.env.BASE_URL}pokedex.json`;
@@ -65,7 +67,7 @@ export function App({ store }: { store: ProgressStore }) {
       <header className="bar" ref={barRef}>
         <h1>Gotta Name 'Em All</h1>
         {load.state === "ready" && <Counter store={store} data={load.data} />}
-        <Menu store={store} />
+        <Menu store={store} data={load.state === "ready" ? load.data : undefined} />
       </header>
 
       <main>
@@ -120,10 +122,27 @@ function Wall({ store, data }: { store: ProgressStore; data: Dataset }) {
     () => store.epoch,
   );
   const groups = useMemo(() => groupByGeneration(data.species), [data]);
+  // Completed generations, as a string so the snapshot is stable between changes.
+  const completed = useSyncExternalStore(
+    useCallback((l: () => void) => store.subscribeAll(l), [store]),
+    () =>
+      groups
+        .filter((g) => store.solvedCount(g.species.map((s) => s.id)) === g.species.length)
+        .map((g) => g.generation)
+        .join(),
+  );
+  const iconStyles = useMemo(
+    () =>
+      unlockedIconStyles(
+        completed ? completed.split(",").map(Number) : [],
+        groups.map((g) => g.generation),
+      ),
+    [completed, groups],
+  );
   return (
     <div key={epoch}>
       {groups.map((g) => (
-        <GenerationSection key={g.generation} group={g} store={store} answers={answers} />
+        <GenerationSection key={g.generation} group={g} store={store} answers={answers} iconStyles={iconStyles} />
       ))}
     </div>
   );
@@ -133,10 +152,12 @@ export function GenerationSection({
   group,
   store,
   answers,
+  iconStyles,
 }: {
   group: GenerationGroup;
   store: ProgressStore;
   answers: AnswerIndex;
+  iconStyles: readonly number[]; // unlocked icon styles, by generation
 }) {
   const ids = useMemo(() => group.species.map((s) => s.id), [group]);
   const solved = useSyncExternalStore(
@@ -149,10 +170,22 @@ export function GenerationSection({
   const [collapsed, setCollapsed] = useState(() => isCollapsed(group.generation));
   const sectionRef = useRef<HTMLElement>(null);
   const toggled = useRef(false);
-  // Completing a generation unlocks swapping its cards' artwork for menu icons.
-  const iconGens = useMemo(() => iconGenerations(group.species), [group]);
+  // A completed generation's cards can swap their artwork for any unlocked
+  // icon style its species appear in.
+  const iconGens = useMemo(
+    () => iconGenerations(group.species).filter((g) => iconStyles.includes(g)),
+    [group, iconStyles],
+  );
   const [iconStyle, setIconStyle] = useState(() => getIconStyle(group.generation));
   const iconGen = complete && iconStyle !== undefined && iconGens.includes(iconStyle) ? iconStyle : undefined;
+  // Wiggle the picker when it gains a style during this visit (not on load).
+  const offered = complete ? iconGens.length : 0;
+  const lastOffered = useRef(offered);
+  const [jiggle, setJiggle] = useState(false);
+  useEffect(() => {
+    if (offered > lastOffered.current) setJiggle(true);
+    lastOffered.current = offered;
+  }, [offered]);
 
   // Collapsing from partway down a long section would leave the view far
   // below its header; pull the header back up under the top bar. Skipped for
@@ -187,8 +220,12 @@ export function GenerationSection({
               }}
             >
               <span className="chevron" aria-hidden="true" />
-              {group.title}
-              {group.region && <span className="region"> · {group.region}</span>}
+              {/* "Generation" shortens to "Gen" on narrow screens (see CSS). */}
+              <span>
+                <span className="gen-long">Generation</span>
+                <span className="gen-short">Gen</span> {romanGeneration(group.generation)}
+                {group.region && <span className="region"> · {group.region}</span>}
+              </span>
             </button>
           </h2>
           <div className="generation-meta">
@@ -197,30 +234,25 @@ export function GenerationSection({
               {fmt.format(solved)} / {fmt.format(ids.length)}
             </p>
             {complete && iconGens.length > 0 && (
-              <select
-                className="icon-style"
-                aria-label={`Card fronts for ${group.title}`}
-                value={iconGen ?? ""}
-                onChange={(e) => {
-                  const next = e.target.value ? Number(e.target.value) : undefined;
+              <IconStylePicker
+                title={group.title}
+                choices={iconGens}
+                value={iconGen}
+                onChange={(next) => {
                   saveIconStyle(group.generation, next);
                   setIconStyle(next);
                 }}
-              >
-                <option value="">Artwork</option>
-                {iconGens.map((g) => (
-                  <option key={g} value={g}>
-                    Gen {romanGeneration(g)} icons
-                  </option>
-                ))}
-              </select>
+                sample={group.species[0]}
+                unlocked={iconStyles}
+                jiggle={jiggle}
+              />
             )}
           </div>
         </div>
       </header>
       <ol className="wall" id={wallId} start={ids[0]} hidden={collapsed}>
         {group.species.map((s) => (
-          <Tile key={s.id} species={s} store={store} answers={answers} iconGen={iconGen} />
+          <Tile key={s.id} species={s} store={store} answers={answers} iconGen={iconGen} iconStyles={iconStyles} />
         ))}
       </ol>
     </section>
@@ -316,7 +348,7 @@ const KANTO_IDS = Array.from({ length: 151 }, (_, i) => i + 1);
 type Confirming = null | "reset" | "oath";
 
 // Rarely needed actions live behind a "⋯" menu so Reset isn't one click away.
-export function Menu({ store }: { store: ProgressStore }) {
+export function Menu({ store, data }: { store: ProgressStore; data?: Dataset }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState<Confirming>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -400,6 +432,7 @@ export function Menu({ store }: { store: ProgressStore }) {
               <button type="button" className="menu-item" onClick={() => setConfirming("reset")}>
                 Reset progress…
               </button>
+              {import.meta.env.DEV && data && <DevTools store={store} data={data} />}
             </>
           )}
         </div>
