@@ -6,6 +6,9 @@
 //   public/sil/<id>.webp     solid black silhouette cut from the same artwork
 //   public/anim/<id>.gif     animated sprite (shown when a solved card flips),
 //                            where one exists
+//   public/sprites/<gen>/<id>.<ext>
+//                            the in-game sprite from each generation's games
+//                            (swiped through on a flipped card)
 //   public/dex/<id>.json     English Pokédex entries (flavor text) by
 //                            generation, shown on the back of a flipped card
 //
@@ -31,6 +34,29 @@ const ANIM_SOURCES = [
   { name: "showdown", url: (id) => `${SPRITES}/other/showdown/${id}.gif` },
   { name: "black-white", url: (id) => `${SPRITES}/versions/generation-v/black-white/animated/${id}.gif` },
 ];
+// One sprite per generation, from that generation's games, tried in order.
+// Gens I–VI ship as-is (Gen V's animate). Gen VII's animated GIFs average
+// 165 KB (130 MB in all), and Gens VIII–IX are 512px animated renders of
+// 0.5–2.6 MB each, so those ship as a still first frame, VIII–IX resized.
+// Output extensions must match src/lib/sprites.ts.
+const VERSIONS = `${SPRITES}/versions`;
+const GEN_SPRITES = [
+  { gen: 1, ext: "png", sources: ["generation-i/red-blue/transparent"] },
+  { gen: 2, ext: "png", sources: ["generation-ii/crystal/transparent"] },
+  { gen: 3, ext: "png", sources: ["generation-iii/emerald"] },
+  { gen: 4, ext: "png", sources: ["generation-iv/platinum"] },
+  { gen: 5, ext: "gif", sources: ["generation-v/black-white/animated"] },
+  { gen: 6, ext: "png", sources: ["generation-vi/x-y"] },
+  { gen: 7, ext: "png", still: { from: "gif" }, sources: ["generation-vii/ultra-sun-ultra-moon"] },
+  {
+    gen: 8,
+    ext: "webp",
+    still: { from: "webp", size: 192 },
+    sources: ["generation-viii/sword-shield", "generation-viii/legends-arceus"],
+  },
+  { gen: 9, ext: "webp", still: { from: "webp", size: 192 }, sources: ["generation-ix/scarlet-violet"] },
+];
+const SPRITES_MISSING = path.join(ROOT, "scripts", ".cache", "sprites-missing.json");
 const IMAGE_SIZE = 256;
 const ENGLISH = 9;
 const FORCE_IMAGES = process.argv.includes("--force-images");
@@ -218,6 +244,58 @@ async function buildAnimation(entry) {
   return false;
 }
 
+// Fetches a URL, retrying network and 5xx errors; null on 404.
+async function fetchFile(url) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.status === 404) return null;
+      if (res.ok) return Buffer.from(await res.arrayBuffer());
+      if (res.status < 500 || attempt >= 4) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      if (attempt >= 4) throw new Error(`${url}: ${err.message}`);
+    }
+    await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+  }
+}
+
+// Builds public/sprites/<gen>/<id>.<ext> for every generation the species
+// existed in and returns those generations. Known 404s are remembered in
+// scripts/.cache so re-runs don't ask again.
+async function buildGenSprites(entry, missing) {
+  const gens = [];
+  for (const { gen, ext, still, sources } of GEN_SPRITES) {
+    if (gen < entry.generation) continue;
+    const out = path.join(PUBLIC, "sprites", String(gen), `${entry.id}.${ext}`);
+    const key = `${gen}/${entry.id}`;
+    if (!FORCE_IMAGES && (await exists(out))) {
+      gens.push(gen);
+      continue;
+    }
+    if (!FORCE_IMAGES && missing.has(key)) continue;
+    let found = false;
+    for (const source of sources) {
+      const file = await fetchFile(`${VERSIONS}/${source}/${entry.artworkId}.${still?.from ?? ext}`);
+      if (!file) continue;
+      if (still?.size) {
+        await sharp(file, { page: 0 })
+          .resize(still.size, still.size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .webp({ quality: 80, alphaQuality: 90 })
+          .toFile(out);
+      } else if (still) {
+        await sharp(file, { page: 0 }).png({ palette: true }).toFile(out);
+      } else {
+        await writeFile(out, file);
+      }
+      found = true;
+      break;
+    }
+    if (found) gens.push(gen);
+    else missing.add(key);
+  }
+  return gens;
+}
+
 async function runPool(items, limit, worker) {
   let next = 0;
   let done = 0;
@@ -258,19 +336,40 @@ async function main() {
   console.log(`  animated sprites: ${entries.length - missing.length}/${entries.length}`);
   if (missing.length) console.log(`  no animation for #${missing.join(", #")}`);
 
+  await Promise.all(GEN_SPRITES.map(({ gen }) => mkdir(path.join(PUBLIC, "sprites", String(gen)), { recursive: true })));
+  const missingSprites = new Set(await readFile(SPRITES_MISSING, "utf8").then(JSON.parse, () => []));
+  const spriteFailures = await runPool(entries, 12, async (e) => {
+    e.sprites = await buildGenSprites(e, missingSprites);
+    // The Gen V slide already shows this animation when it came from Black/White.
+    if (e.animated && e.sprites.includes(5)) {
+      const [anim, bw] = await Promise.all([
+        readFile(path.join(PUBLIC, "anim", `${e.id}.gif`)),
+        readFile(path.join(PUBLIC, "sprites", "5", `${e.id}.gif`)),
+      ]);
+      if (anim.equals(bw)) e.animated = false;
+    }
+  });
+  await writeFile(SPRITES_MISSING, JSON.stringify([...missingSprites].sort()) + "\n");
+  if (spriteFailures.length) throw new Error(`Sprite build failed:\n  ${spriteFailures.join("\n  ")}`);
+  for (const { gen } of GEN_SPRITES) {
+    const have = entries.filter((e) => e.sprites.includes(gen)).length;
+    console.log(`  Gen ${gen} sprites: ${have}/${entries.filter((e) => e.generation <= gen).length}`);
+  }
+
   await buildDexEntries(entries);
 
   const dataset = {
     source: "PokéAPI (graphql.pokeapi.co) + PokeAPI/sprites official artwork",
     generatedAt: new Date().toISOString(),
     count: entries.length,
-    species: entries.map(({ id, slug, name, generation, types, animated }) => ({
+    species: entries.map(({ id, slug, name, generation, types, animated, sprites }) => ({
       id,
       slug,
       name,
       generation,
       types,
       animated,
+      sprites,
     })),
   };
   await writeFile(path.join(PUBLIC, "pokedex.json"), JSON.stringify(dataset) + "\n");

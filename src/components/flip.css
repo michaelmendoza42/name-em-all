@@ -1,9 +1,10 @@
-/* Solved-card flip. The picture turns over to the animated sprite and the
-   footer (name and types) turns over to the Pokédex entries, in step, so the
-   card keeps its size and the picture stays a picture. */
+/* Solved-card flip. The picture turns over to a carousel of sprites by
+   generation and the footer (name and types) turns over to the Pokédex
+   entries, in step, so the card keeps its size and the picture stays a picture. */
 
 .art.flip {
   display: block;
+  position: relative;
   width: 100%;
   padding: 0;
   border: 0;
@@ -28,8 +29,8 @@
   transition: transform 520ms cubic-bezier(0.3, 0.7, 0.3, 1);
 }
 
-/* A species without an animated sprite keeps its artwork; only the footer turns. */
-.art.flip.animated.flipped .flip-inner,
+/* A species without sprites keeps its artwork; only the footer turns. */
+.art.flip.turns.flipped .flip-inner,
 .foot.flip.flipped .flip-inner {
   transform: rotateY(180deg);
 }
@@ -64,11 +65,43 @@
   gap: 6px;
 }
 
-/* Animated sprites are pixel art: show them at their natural size, centered,
-   never scaled up (only down if one is bigger than the card). Pixelated
-   rendering keeps edges hard on high-DPI screens. The doubled class beats
-   styles.css's general `.art img` fill rule, which loads later. */
-.art.flip .flip-back img {
+.art.flip.turns {
+  cursor: auto;
+}
+
+/* One sprite per slide; swipe or scroll sideways to snap to the next. */
+.sprite-track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.sprite-track::-webkit-scrollbar {
+  display: none;
+}
+
+.sprite-slide {
+  flex: 0 0 100%;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 22px 26px 18px;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+/* Sprites show at their natural size, centered, never scaled up (only down
+   if one is bigger than the slide). Pixel art keeps hard edges on high-DPI
+   screens. The doubled class beats styles.css's general `.art img` fill
+   rule, which loads later. */
+.art.flip .sprite-slide img {
   display: block;
   width: auto;
   height: auto;
@@ -76,7 +109,93 @@
   max-height: 100%;
   padding: 0;
   object-fit: contain;
+}
+
+.art.flip .sprite-slide img.pixel {
   image-rendering: pixelated;
+}
+
+/* Gens VIII–IX are 192px renders: fit them to the slide. */
+.art.flip .sprite-slide img:not(.pixel) {
+  max-width: 82%;
+  max-height: 82%;
+}
+
+.sprite-label {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.85);
+  color: #4a535e;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.sprite-nav {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 32px;
+  margin-top: -16px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #4a535e;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.sprite-nav.prev {
+  left: 2px;
+}
+
+.sprite-nav.next {
+  right: 2px;
+}
+
+.sprite-nav:hover:not(:disabled) {
+  background: rgb(0 0 0 / 0.06);
+  color: #16191d;
+}
+
+.sprite-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.sprite-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 7px;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.sprite-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.2);
+  transition: background 150ms;
+}
+
+.sprite-dots span.on {
+  background: #4a535e;
+}
+
+.sprite-track:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus);
 }
 
 .art.flip:focus-visible {

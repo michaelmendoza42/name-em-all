@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -7,6 +7,7 @@ import { Tile } from "../components/Tile";
 import { buildAnswerIndex } from "../lib/answers";
 import { groupDexEntries, parseDexEntries } from "../lib/dexEntries";
 import { ProgressStore } from "../lib/progress";
+import { spriteSlides } from "../lib/sprites";
 import { MemoryStorage, byName, dataset } from "./fixtures";
 
 const answers = buildAnswerIndex(dataset.species);
@@ -39,24 +40,31 @@ function setupSolved(name: string) {
   return { ...utils, species, user: userEvent.setup() };
 }
 
+const label = (container: HTMLElement) => container.querySelector(".sprite-label")?.textContent;
+const activeDot = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll(".sprite-dots span")).findIndex((d) => d.classList.contains("on"));
+
 describe("solved card flip", () => {
-  it("dataset marks which species have an animated sprite", () => {
+  it("dataset lists each species' sprite generations, and a distinct animated sprite", () => {
+    expect(byName("Pikachu").sprites).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(byName("Pikachu").animated).toBe(true);
-    expect(byName("Pecharunt").animated).toBe(false);
+    expect(byName("Chikorita").sprites?.[0]).toBe(2);
   });
 
-  it("flips the picture to the sprite and the footer to Pokédex entries, loading them only then, and back", async () => {
+  it("flips the picture to the sprites and the footer to Pokédex entries, loading them only then", async () => {
     const { user, container } = setupSolved("Pikachu");
-    const card = screen.getByRole("button", { name: "Flip card to see Pikachu's Pokédex entries" });
-    expect(card.getAttribute("aria-pressed")).toBe("false");
-    expect(container.querySelector('img[src$="anim/25.gif"]')).toBeNull();
+    const front = screen.getByRole("button", { name: "Flip card to see Pikachu's sprites and Pokédex entries" });
+    expect(container.querySelector(".sprite-slide img")).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
 
-    await user.click(card);
-    expect(card.getAttribute("aria-pressed")).toBe("true");
-    expect(card.classList.contains("flipped")).toBe(true);
+    await user.click(front);
+    expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(true);
     expect(container.querySelector(".foot")!.classList.contains("flipped")).toBe(true);
+    expect(container.querySelector('img[src$="sprites/1/25.png"]')).not.toBeNull();
+    expect(container.querySelector('img[src$="sprites/9/25.webp"]')).not.toBeNull();
     expect(container.querySelector('img[src$="anim/25.gif"]')).not.toBeNull();
+    expect(label(container)).toBe("Gen I");
+    expect(container.querySelectorAll(".sprite-dots span")).toHaveLength(10);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/dex\/25\.json$/));
 
     // The entries replace the footer (name and types), not the picture.
@@ -70,31 +78,50 @@ describe("solved card flip", () => {
 
     // Clicking inside the entries (to scroll or select) keeps the card flipped.
     await user.click(region);
-    expect(card.getAttribute("aria-pressed")).toBe("true");
-
-    await user.click(card);
-    expect(card.getAttribute("aria-pressed")).toBe("false");
-    expect(container.querySelector(".foot")!.classList.contains("flipped")).toBe(false);
-    // The sprite stays loaded so it's visible while turning back.
-    expect(container.querySelector('img[src$="anim/25.gif"]')).not.toBeNull();
+    expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(true);
   });
 
-  it("flips from the keyboard", async () => {
-    const { user } = setupSolved("Bulbasaur");
-    const card = screen.getByRole("button", { name: /Flip card to see/ });
-    card.focus();
+  it("pages with the chevrons, and remembers the sprite across flips", async () => {
+    const { user, container } = setupSolved("Pikachu");
+    await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
+    const prev = screen.getByRole("button", { name: "Previous sprite" }) as HTMLButtonElement;
+    const next = screen.getByRole("button", { name: "Next sprite" });
+    expect(prev.disabled).toBe(true);
+
+    await user.click(next);
+    await user.click(next);
+    expect(label(container)).toBe("Gen III");
+    expect(activeDot(container)).toBe(2);
+    await user.click(prev);
+    expect(label(container)).toBe("Gen II");
+
+    // Flip back (clicking the sprite), then over again: still on Gen II.
+    await user.click(screen.getByRole("group", { name: /Pikachu's sprites/ }));
+    expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(false);
+    await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
+    expect(label(container)).toBe("Gen II");
+    expect(activeDot(container)).toBe(1);
+  });
+
+  it("works from the keyboard: Enter flips, arrows page, Enter flips back", async () => {
+    const { user, container } = setupSolved("Bulbasaur");
+    const front = screen.getByRole("button", { name: /Flip card to see/ });
+    front.focus();
     await user.keyboard("{Enter}");
-    expect(card.getAttribute("aria-pressed")).toBe("true");
-    await user.keyboard(" ");
-    expect(card.getAttribute("aria-pressed")).toBe("false");
+    const track = screen.getByRole("group", { name: /Bulbasaur's sprites/ });
+    expect(document.activeElement).toBe(track);
+    await user.keyboard("{ArrowRight}{ArrowRight}{ArrowLeft}");
+    expect(label(container)).toBe("Gen II");
+    await user.keyboard("{Enter}");
+    expect(container.querySelector(".art")!.classList.contains("flipped")).toBe(false);
+    expect(document.activeElement).toBe(front);
   });
 
-  it("keeps the artwork and still shows entries when no animated sprite exists", async () => {
+  it("starts at the generation the species debuted in", async () => {
     const { user, container } = setupSolved("Pecharunt");
-    const card = screen.getByRole("button", { name: /Flip card to see Pecharunt/ });
-    await user.click(card);
-    expect(card.classList.contains("animated")).toBe(false);
-    expect(container.querySelector(".flip-back img")).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Flip card to see/ }));
+    expect(label(container)).toBe("Gen IX");
+    expect(screen.queryByRole("button", { name: "Next sprite" })).toBeNull();
     const region = await screen.findByRole("region", { name: "Pecharunt's Pokédex entries" });
     expect(await within(region).findByRole("heading", { name: "Gen IX" })).toBeTruthy();
   });
@@ -116,6 +143,20 @@ describe("solved card flip", () => {
       </ul>,
     );
     expect(screen.queryByRole("button", { name: /Flip card/ })).toBeNull();
+  });
+});
+
+describe("sprite files", () => {
+  it("every listed sprite exists on disk", () => {
+    for (const s of dataset.species) {
+      for (const slide of spriteSlides(s)) {
+        expect(existsSync(path.resolve(process.cwd(), "public", slide.path)), slide.path).toBe(true);
+      }
+    }
+  });
+
+  it("no species lists a sprite from before it existed", () => {
+    for (const s of dataset.species) expect(s.sprites?.every((g) => g >= s.generation), s.name).toBe(true);
   });
 });
 

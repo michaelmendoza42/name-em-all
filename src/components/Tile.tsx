@@ -15,6 +15,7 @@ import { normalizeAnswer, type AnswerIndex } from "../lib/answers";
 import { remainingPattern, revealableCount, revealedPrefix, visibleTypes } from "../lib/hints";
 import type { ProgressStore } from "../lib/progress";
 import { focusAndGlide } from "../lib/scroll";
+import { spriteSlides } from "../lib/sprites";
 import { DexFooter } from "./DexFooter";
 import { FlipArt } from "./FlipArt";
 
@@ -65,6 +66,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
   const [holdFocus, setHoldFocus] = useState(false);
   // Solved cards flip: sprite in the picture, Pokédex entries in the footer.
   const [flipped, setFlipped] = useState(false);
+  const slides = useMemo(() => spriteSlides(species), [species]);
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const hintsRef = useRef<HTMLDivElement>(null);
@@ -156,7 +158,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
         <FlipArt
           id={id}
           name={name}
-          animated={species.animated === true}
+          slides={slides}
           flipped={flipped}
           onFlip={() => setFlipped((f) => !f)}
         />

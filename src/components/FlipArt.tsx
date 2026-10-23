@@ -1,4 +1,5 @@
-import { useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import type { SpriteSlide } from "../lib/sprites";
 import "./flip.css";
 
 const BASE = import.meta.env.BASE_URL;
@@ -6,19 +7,65 @@ const BASE = import.meta.env.BASE_URL;
 interface Props {
   id: number;
   name: string;
-  animated: boolean;
+  slides: readonly SpriteSlide[];
   flipped: boolean;
   onFlip: () => void;
 }
 
-// A solved tile's image, and the button that flips the card. Flipped, the
-// picture turns over to the animated sprite (when the species has one) while
-// the footer below turns over to the Pokédex entries (DexFooter). The sprite
-// only downloads the first time the card is flipped.
-export function FlipArt({ id, name, animated, flipped, onFlip }: Props) {
-  // Keep the sprite once loaded, so it's still there while flipping back.
+// A solved tile's image. Clicking it (or Enter/Space) flips the card: the
+// picture turns over to a carousel of the species' sprites, one per
+// generation, while the footer turns over to its Pokédex entries
+// (DexFooter). Swipe, the chevrons or ←/→ move between sprites; the card
+// remembers which one was showing across flips. Sprites only download once
+// the card has been flipped. With no sprites, the artwork stays put.
+export function FlipArt({ id, name, slides, flipped, onFlip }: Props) {
+  const [index, setIndex] = useState(0);
+  const frontRef = useRef<HTMLButtonElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const toggled = useRef(false);
   const seen = useRef(false);
   seen.current ||= flipped;
+  const canFlip = slides.length > 0;
+
+  // Put the track back on the remembered slide whenever the card turns over.
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (flipped && track) track.scrollLeft = index * track.clientWidth;
+  }, [flipped]); // index is read, not tracked: scrolling is what updates it
+
+  // The face turned away is inert, so keep keyboard focus on the visible one.
+  useEffect(() => {
+    if (!toggled.current) return;
+    (flipped ? trackRef : frontRef).current?.focus({ preventScroll: true });
+  }, [flipped]);
+
+  function flip() {
+    toggled.current = true;
+    onFlip();
+  }
+
+  function go(to: number) {
+    const track = trackRef.current;
+    const i = Math.max(0, Math.min(slides.length - 1, to));
+    track?.scrollTo?.({ left: i * track.clientWidth, behavior: "smooth" });
+    setIndex(i);
+  }
+
+  function onScroll() {
+    const track = trackRef.current;
+    if (track && track.clientWidth) setIndex(Math.round(track.scrollLeft / track.clientWidth));
+  }
+
+  function onTrackKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    const move = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    if (move) {
+      e.preventDefault();
+      go(index + move);
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      flip();
+    }
+  }
 
   const artwork = (
     <img
@@ -32,22 +79,104 @@ export function FlipArt({ id, name, animated, flipped, onFlip }: Props) {
     />
   );
 
+  if (!canFlip) {
+    return (
+      <button
+        type="button"
+        className="art flip"
+        aria-pressed={flipped}
+        aria-label={`Flip card to see ${name}'s Pokédex entries`}
+        onClick={onFlip}
+      >
+        <span className="flip-inner">
+          <span className="flip-face flip-front">{artwork}</span>
+        </span>
+      </button>
+    );
+  }
+
+  const current = slides[Math.min(index, slides.length - 1)];
   return (
-    <button
-      type="button"
-      className={`art flip${animated ? " animated" : ""}${flipped ? " flipped" : ""}`}
-      aria-pressed={flipped}
-      aria-label={`Flip card to see ${name}'s Pokédex entries`}
-      onClick={onFlip}
-    >
-      <span className="flip-inner">
-        <span className="flip-face flip-front">{artwork}</span>
-        {animated && (
-          <span className="flip-face flip-back">
-            {seen.current && <img src={`${BASE}anim/${id}.gif`} alt={`${name}, animated`} draggable={false} />}
+    <div className={`art flip turns${flipped ? " flipped" : ""}`}>
+      <div className="flip-inner">
+        <button
+          type="button"
+          ref={frontRef}
+          className="flip-face flip-front"
+          aria-label={`Flip card to see ${name}'s sprites and Pokédex entries`}
+          inert={flipped}
+          onClick={flip}
+        >
+          {artwork}
+        </button>
+        <div className="flip-face flip-back" inert={!flipped}>
+          <div
+            className="sprite-track"
+            ref={trackRef}
+            role="group"
+            aria-roledescription="carousel"
+            aria-label={`${name}'s sprites by generation. ${current.label}, ${index + 1} of ${slides.length}. Arrow keys change sprite; Enter flips back.`}
+            tabIndex={0}
+            onScroll={onScroll}
+            onKeyDown={onTrackKeyDown}
+            onClick={flip}
+          >
+            {slides.map((s, i) => (
+              <figure key={s.key} className="sprite-slide" aria-hidden={i !== index}>
+                {seen.current && (
+                  <img
+                    src={`${BASE}${s.path}`}
+                    alt={`${name}, ${s.label} sprite`}
+                    className={s.pixelArt ? "pixel" : undefined}
+                    loading="lazy"
+                    draggable={false}
+                  />
+                )}
+              </figure>
+            ))}
+          </div>
+          <span className="sprite-label" aria-hidden="true">
+            {current.label}
           </span>
-        )}
-      </span>
-    </button>
+          {slides.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="sprite-nav prev"
+                aria-label="Previous sprite"
+                disabled={index === 0}
+                tabIndex={-1}
+                onClick={() => go(index - 1)}
+              >
+                <Chevron d="M10 3 5 8l5 5" />
+              </button>
+              <button
+                type="button"
+                className="sprite-nav next"
+                aria-label="Next sprite"
+                disabled={index === slides.length - 1}
+                tabIndex={-1}
+                onClick={() => go(index + 1)}
+              >
+                <Chevron d="M6 3l5 5-5 5" />
+              </button>
+              <span className="sprite-dots" aria-hidden="true">
+                {slides.map((s, i) => (
+                  <span key={s.key} className={i === index ? "on" : undefined} />
+                ))}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Chevron({ d }: { d: string }) {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

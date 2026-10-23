@@ -4,7 +4,8 @@ export interface Species {
   name: string; // official English name
   generation: number;
   types: readonly string[];
-  animated?: boolean; // has public/anim/<id>.gif for the solved-card flip
+  animated?: boolean; // has public/anim/<id>.gif, distinct from its Gen V sprite
+  sprites?: readonly number[]; // generations with public/sprites/<gen>/<id>.*
 }
 
 export interface Dataset {

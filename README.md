@@ -49,7 +49,14 @@ git archive HEAD | docker build --build-arg REVISION=$(git rev-parse HEAD) -t na
 - **Artwork**: PokeAPI/sprites official artwork, resized to 256×256 WebP (`public/art`).
 - **Silhouettes**: cut from the same artwork by keeping only its alpha channel
   and painting it black (`public/sil`), so silhouette files contain no color or detail.
-- **Pokédex entries** (the footer of a flipped solved card, under the sprite): PokéAPI's English flavor
+- **Sprites by generation** (the picture of a flipped solved card, a swipeable
+  carousel): each generation's in-game sprite from PokeAPI/sprites
+  (`public/sprites/<gen>/<id>.*`): Red/Blue, Crystal, Emerald, Platinum,
+  Black/White (animated), X/Y, Ultra Sun/Moon, Sword/Shield (Legends: Arceus
+  for Hisui), Scarlet/Violet. Gens VII–IX ship as still first frames (their
+  animations run 0.2–2.6 MB each); VIII–IX are resized to 192px. Then the
+  modern animated sprite (`public/anim`) when it differs from Gen V's.
+- **Pokédex entries** (the footer of a flipped solved card): PokéAPI's English flavor
   text, one file per species (`public/dex/<id>.json`, fetched on first flip),
   grouped by the generation of the game. Line breaks and soft hyphens are
   flowed into sentences, old all-caps names (PIKACHU, POKéMON) are written the
