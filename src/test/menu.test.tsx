@@ -63,8 +63,12 @@ describe("Menu", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     await user.click(screen.getByRole("button", { name: "More options" }));
     expect(screen.queryByRole("button", { name: /Fill in the original 151/ })).toBeNull();
-    const done = screen.getByRole("button", { name: /sworn & notarized/ }) as HTMLButtonElement;
-    expect(done.disabled).toBe(true);
+    await user.click(screen.getByRole("button", { name: /sworn & notarized/ }));
+    const box = screen.getByRole("checkbox", { name: /solemnly swear/ }) as HTMLInputElement;
+    expect(box.checked && box.disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: /Swear/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("declining the oath changes nothing", async () => {

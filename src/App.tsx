@@ -355,15 +355,14 @@ export function Menu({ store }: { store: ProgressStore }) {
             </div>
           ) : (
             <>
-              {kantoDone ? (
-                <button type="button" className="menu-item" disabled>
-                  Original 151: sworn &amp; notarized ✓
-                </button>
-              ) : (
-                <button type="button" className="menu-item" onClick={() => setConfirming("oath")} autoFocus>
-                  Fill in the original 151…
-                </button>
-              )}
+              <button
+                type="button"
+                className={kantoDone ? "menu-item done" : "menu-item"}
+                onClick={() => setConfirming("oath")}
+                autoFocus
+              >
+                {kantoDone ? "Original 151: sworn & notarized ✓" : "Fill in the original 151…"}
+              </button>
               <button type="button" className="menu-item" onClick={() => setConfirming("reset")}>
                 Reset progress…
               </button>
@@ -374,6 +373,7 @@ export function Menu({ store }: { store: ProgressStore }) {
       {open && confirming === "oath" && (
         <KantoOath
           ref={oathRef}
+          executed={kantoDone}
           onCancel={() => setConfirming(null)}
           onSwear={() => {
             store.solveMany(KANTO_IDS);
@@ -390,14 +390,17 @@ export function Menu({ store }: { store: ProgressStore }) {
 // overlay inside the bar.
 function KantoOath({
   ref,
+  executed,
   onCancel,
   onSwear,
 }: {
   ref: Ref<HTMLDivElement>;
+  // Already sworn (or all 151 earned): show the terms read-only, for posterity.
+  executed: boolean;
   onCancel: () => void;
   onSwear: () => void;
 }) {
-  const [sworn, setSworn] = useState(false);
+  const [sworn, setSworn] = useState(executed);
   const titleId = useId();
   return createPortal(
     <div className="oath-backdrop" ref={ref}>
@@ -434,19 +437,34 @@ function KantoOath({
           </ol>
         </div>
         <label className="oath-swear">
-          <input type="checkbox" checked={sworn} onChange={(e) => setSworn(e.target.checked)} autoFocus />
+          <input
+            type="checkbox"
+            checked={sworn}
+            disabled={executed}
+            onChange={(e) => setSworn(e.target.checked)}
+            autoFocus={!executed}
+          />
           <span>
             I do solemnly swear that I know the original 151, because I am a millennial or close enough.
           </span>
         </label>
-        <div className="confirm-actions">
-          <button type="button" onClick={onCancel}>
-            I decline (respectfully)
-          </button>
-          <button type="button" className="primary" disabled={!sworn} onClick={onSwear}>
-            Swear &amp; fill in 151
-          </button>
-        </div>
+        {executed ? (
+          <div className="confirm-actions">
+            <p className="oath-executed">Executed. No take-backs.</p>
+            <button type="button" onClick={onCancel} autoFocus>
+              Close
+            </button>
+          </div>
+        ) : (
+          <div className="confirm-actions">
+            <button type="button" onClick={onCancel}>
+              I decline (respectfully)
+            </button>
+            <button type="button" className="primary" disabled={!sworn} onClick={onSwear}>
+              Swear &amp; fill in 151
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     document.body,

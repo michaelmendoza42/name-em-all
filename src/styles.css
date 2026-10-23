@@ -123,8 +123,9 @@ input {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  width: min(260px, calc(100vw - 32px));
+  width: min(280px, calc(100vw - 32px));
   padding: 10px;
+  container-type: inline-size;
   display: grid;
   gap: 8px;
   background: var(--surface);
@@ -144,11 +145,13 @@ input {
   text-align: left;
 }
 
-.bar .menu-item:disabled {
+/* One line always: shrink with the panel on narrow screens instead of wrapping. */
+.bar .menu-item.done {
+  white-space: nowrap;
+  font-size: min(14px, 5.4cqi);
   color: var(--solved);
   border-color: color-mix(in srgb, var(--solved) 40%, var(--border));
   background: var(--solved-bg);
-  cursor: default;
 }
 
 .confirm p {
@@ -690,7 +693,7 @@ main {
 /* Only the legalese is serif; title and buttons match the rest of the site. */
 .oath-terms,
 .oath-swear {
-  font-family: "Libre Caslon Text", Georgia, "Times New Roman", serif;
+  font-family: "Courier Prime", "Courier New", monospace;
 }
 
 .oath-terms {
@@ -751,4 +754,20 @@ main {
 
 .oath .confirm-actions {
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.oath-swear:has(input:disabled) {
+  cursor: default;
+}
+
+.oath-executed {
+  margin: 0 auto 0 0;
+  white-space: nowrap;
+  font-size: 12px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--solved);
 }
