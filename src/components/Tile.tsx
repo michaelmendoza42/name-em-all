@@ -18,7 +18,7 @@ import { focusAndGlide } from "../lib/scroll";
 import { defaultSlide, spriteSlides } from "../lib/sprites";
 import { DexFooter } from "./DexFooter";
 import { FlipArt } from "./FlipArt";
-import { ArtIcon, HintMenu, LetterIcon, TypeIcon, type HintOption } from "./HintMenu";
+import { HintMenu, type HintOption } from "./HintMenu";
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -136,10 +136,13 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
         target.focus();
       }
     } else if (e.key === "ArrowDown") {
-      const toggle = hintToggleRef.current;
-      if (toggle && !toggle.disabled) {
+      // The Hint circle, or the first hint once it has spread into a row.
+      const target =
+        hintToggleRef.current ??
+        e.currentTarget.closest(".answer")?.querySelector<HTMLButtonElement>(".hints button:not(:disabled)");
+      if (target && !target.disabled) {
         e.preventDefault();
-        toggle.focus();
+        target.focus();
       }
     }
   }
@@ -159,7 +162,6 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
   const hintOptions: HintOption[] = [
     {
       key: "artwork",
-      icon: <ArtIcon />,
       text: "Artwork",
       done: progress.artwork,
       label: progress.artwork ? `Artwork revealed for ${label}` : `Reveal artwork for ${label}`,
@@ -168,9 +170,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
     },
     {
       key: "type",
-      icon: <TypeIcon />,
       text: "Type",
-      count: `${typesShown.length}/${types.length}`,
       done: allTypes,
       label: allTypes ? `All types revealed for ${label}` : `Reveal Type for ${label}`,
       title: allTypes ? "All types revealed" : "Reveal a type",
@@ -178,9 +178,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
     },
     {
       key: "letter",
-      icon: <LetterIcon />,
       text: "Letter",
-      count: `${progress.letters}/${letterTotal}`,
       done: allLetters,
       label: allLetters ? `All letters revealed for ${label}` : `Reveal Letter for ${label}`,
       title: allLetters ? "All letters revealed" : "Reveal the next letter",
@@ -250,7 +248,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
           </div>
         </DexFooter>
       ) : (
-        <>
+        <div className={`answer${hintsOpen ? " open" : ""}`}>
           {/* Clicking anywhere in the box (including the locked letters) focuses the input. */}
           <div className={`guess${prefix ? " has-prefix" : ""}`} onClick={() => inputRef.current?.focus()}>
             <label htmlFor={inputId} className="sr-only">
@@ -292,7 +290,7 @@ export const Tile = memo(function Tile({ species, store, answers }: Props) {
             toggleRef={hintToggleRef}
             onExitUp={() => inputRef.current?.focus()}
           />
-        </>
+        </div>
       )}
     </li>
   );

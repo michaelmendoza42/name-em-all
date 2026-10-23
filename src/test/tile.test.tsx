@@ -225,9 +225,11 @@ describe("keyboard flow", () => {
     expect(screen.queryByRole("button", { name: /Reveal/ })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Hint for Pokémon #0001" }));
     expect(screen.getByRole("button", { name: "Reveal Type for Pokémon #0001" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Hint for Pokémon #0001" }).getAttribute("aria-expanded")).toBe("true");
+    // The Hint circle spreads into the row: it's gone while the hints show.
+    expect(screen.queryByRole("button", { name: "Hint for Pokémon #0001" })).toBeNull();
     await user.click(input("Ivysaur"));
     expect(screen.queryByRole("button", { name: /Reveal/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Hint for Pokémon #0001" })).toBeTruthy();
   });
 
   it("marks only the card being used as engaged", async () => {
