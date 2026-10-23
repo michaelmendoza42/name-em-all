@@ -6,6 +6,7 @@
 //   public/sil/<id>.webp     solid black silhouette cut from the same artwork
 //   public/anim/<id>.gif     animated sprite (shown when a solved card flips),
 //                            where one exists
+//   public/anim/back/<id>.gif  its animated back sprite, from the same source
 //   public/sprites/<gen>/<id>.<ext>
 //                            the in-game sprite from each generation's games
 //                            (swiped through on a flipped card)
@@ -34,8 +35,8 @@ const SPRITES = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprite
 // Animated sprite sources, best first. Showdown covers the most species;
 // Black/White fills gaps (its sprites above #650 are fan-made Gen 5 style).
 const ANIM_SOURCES = [
-  { name: "showdown", url: (id) => `${SPRITES}/other/showdown/${id}.gif` },
-  { name: "black-white", url: (id) => `${SPRITES}/versions/generation-v/black-white/animated/${id}.gif` },
+  { name: "showdown", dir: `${SPRITES}/other/showdown` },
+  { name: "black-white", dir: `${SPRITES}/versions/generation-v/black-white/animated` },
 ];
 // Per-generation sprites from each generation's games, tried in order. Each
 // set lands in public/<dir>/<gen>/<id>.<ext>, and the generations a species
@@ -282,27 +283,46 @@ async function buildImages(entry) {
   await sharp(rgba, { raw: { width, height, channels: 4 } }).webp({ lossless: true }).toFile(silOut);
 }
 
-// Returns true when public/anim/<id>.gif exists (copied now or earlier).
+// Copies the species' animated sprite to public/anim/<id>.gif from the first
+// source that has one, and returns that source (null when none does). The
+// cached download says which source it came from on later runs.
 // GIFs ship as-is: re-encoding these small sprites as WebP made them larger
 // (lossy) or barely smaller (lossless) at a much slower build.
 async function buildAnimation(entry) {
   const out = path.join(PUBLIC, "anim", `${entry.id}.gif`);
-  if (!FORCE_IMAGES && (await exists(out))) return true;
   for (const source of ANIM_SOURCES) {
     const file = path.join(ANIM_CACHE, `${source.name}-${entry.artworkId}.gif`);
     let gif;
-    if (await exists(file)) gif = await readFile(file);
-    else {
-      const res = await fetch(source.url(entry.artworkId));
+    if (await exists(file)) {
+      if (!FORCE_IMAGES && (await exists(out))) return source;
+      gif = await readFile(file);
+    } else {
+      const res = await fetch(`${source.dir}/${entry.artworkId}.gif`);
       if (res.status === 404) continue;
       if (!res.ok) throw new Error(`animation ${source.name} ${entry.artworkId}: HTTP ${res.status}`);
       gif = Buffer.from(await res.arrayBuffer());
       await writeFile(file, gif);
     }
     await writeFile(out, gif);
-    return true;
+    return source;
   }
-  return false;
+  return null;
+}
+
+// Copies the matching animated back sprite, from the same source as the
+// front, to public/anim/back/<id>.gif; returns whether it exists.
+async function buildAnimationBack(entry, source, missing) {
+  const out = path.join(PUBLIC, "anim", "back", `${entry.id}.gif`);
+  const key = `anim/back/${source.name}/${entry.id}`;
+  if (!FORCE_IMAGES && (await exists(out))) return true;
+  if (!FORCE_IMAGES && missing.has(key)) return false;
+  const gif = await fetchFile(`${source.dir}/back/${entry.artworkId}.gif`);
+  if (!gif) {
+    missing.add(key);
+    return false;
+  }
+  await writeFile(out, gif);
+  return true;
 }
 
 // Fetches a URL, retrying network and 5xx errors; null on 404.
@@ -428,7 +448,7 @@ async function runPool(items, limit, worker) {
 }
 
 async function main() {
-  await Promise.all(["art", "sil", "anim"].map((d) => mkdir(path.join(PUBLIC, d), { recursive: true })));
+  await Promise.all(["art", "sil", "anim/back"].map((d) => mkdir(path.join(PUBLIC, d), { recursive: true })));
   await mkdir(CACHE, { recursive: true });
   await mkdir(ANIM_CACHE, { recursive: true });
 
@@ -439,18 +459,23 @@ async function main() {
   const failures = await runPool(entries, 12, buildImages);
   if (failures.length) throw new Error(`Image build failed for ${failures.length} species:\n  ${failures.join("\n  ")}`);
 
+  const missingSprites = new Set(await readFile(SPRITES_MISSING, "utf8").then(JSON.parse, () => []));
   const animFailures = await runPool(entries, 12, async (e) => {
-    e.animated = await buildAnimation(e);
+    const source = await buildAnimation(e);
+    e.animated = Boolean(source);
+    e.animatedBack = source ? await buildAnimationBack(e, source, missingSprites) : false;
   });
   if (animFailures.length) throw new Error(`Animation build failed:\n  ${animFailures.join("\n  ")}`);
   const missing = entries.filter((e) => !e.animated).map((e) => e.id);
   console.log(`  animated sprites: ${entries.length - missing.length}/${entries.length}`);
   if (missing.length) console.log(`  no animation for #${missing.join(", #")}`);
+  const noBack = entries.filter((e) => e.animated && !e.animatedBack).map((e) => e.id);
+  console.log(`  animated back sprites: ${entries.length - missing.length - noBack.length}/${entries.length - missing.length}`);
+  if (noBack.length) console.log(`  no animated back for #${noBack.join(", #")}`);
 
   for (const set of SPRITE_SETS) {
     await Promise.all(set.gens.map(({ gen }) => mkdir(path.join(PUBLIC, set.dir, String(gen)), { recursive: true })));
   }
-  const missingSprites = new Set(await readFile(SPRITES_MISSING, "utf8").then(JSON.parse, () => []));
   const spriteFailures = await runPool(entries, 12, async (e) => {
     for (const set of SPRITE_SETS) e[set.field] = await buildSpriteSet(e, set, missingSprites);
     // The Gen V slide already shows this animation when it came from Black/White.
@@ -459,7 +484,7 @@ async function main() {
         readFile(path.join(PUBLIC, "anim", `${e.id}.gif`)),
         readFile(path.join(PUBLIC, "sprites", "5", `${e.id}.gif`)),
       ]);
-      if (anim.equals(bw)) e.animated = false;
+      if (anim.equals(bw)) e.animated = e.animatedBack = false;
     }
   });
   await writeFile(SPRITES_MISSING, JSON.stringify([...missingSprites].sort()) + "\n");
@@ -478,13 +503,14 @@ async function main() {
     source: "PokéAPI (graphql.pokeapi.co) + PokeAPI/sprites official artwork",
     generatedAt: new Date().toISOString(),
     count: entries.length,
-    species: entries.map(({ id, slug, name, generation, types, animated, sprites, backSprites, icons }) => ({
+    species: entries.map(({ id, slug, name, generation, types, animated, animatedBack, sprites, backSprites, icons }) => ({
       id,
       slug,
       name,
       generation,
       types,
       animated,
+      animatedBack,
       sprites,
       backSprites,
       icons,

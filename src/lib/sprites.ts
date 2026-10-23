@@ -46,3 +46,20 @@ export function spriteSlides(species: Pick<Species, "id" | "sprites" | "backSpri
   return slides;
 }
 
+
+// Every generation whose menu icons cover at least one of these species,
+// oldest first. Icons start in Gen III, so Gens I–II have none of their own.
+export function iconGenerations(species: readonly Pick<Species, "icons">[]): number[] {
+  return [...new Set(species.flatMap((s) => s.icons ?? []))].sort((a, b) => a - b);
+}
+
+// The species' icon closest to the chosen generation's style: that one, else
+// its latest icon before it, else its earliest after it. Undefined when the
+// species has no icons at all.
+export function iconFor(species: Pick<Species, "id" | "icons">, generation: number): string | undefined {
+  const gens = species.icons ?? [];
+  const gen = gens.includes(generation)
+    ? generation
+    : (gens.filter((g) => g < generation).at(-1) ?? gens.find((g) => g > generation));
+  return gen === undefined ? undefined : iconPath(gen, species.id);
+}

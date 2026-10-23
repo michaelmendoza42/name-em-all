@@ -21,8 +21,8 @@ interface Props {
 
 const BulbIcon = () => (
   <svg
-    width="13"
-    height="13"
+    width="11"
+    height="11"
     viewBox="0 0 16 16"
     aria-hidden="true"
     fill="none"
