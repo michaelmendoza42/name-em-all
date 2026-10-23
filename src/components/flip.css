@@ -311,16 +311,24 @@
   }
 }
 
-/* A completed generation's menu icon in place of the artwork, at its native
-   size (one icon pixel per CSS pixel) so it stays sharp; only icons bigger
+/* A completed generation's menu icon in place of the artwork, at 2× its
+   native size (FlipArt sets the width) so pixels stay whole; icons bigger
    than the front (Gen IX's) shrink to fit. */
 .art.flip .flip-front img.front-icon {
   width: auto;
   height: auto;
+  padding: 0; /* not styles.css's .art img inset, which would eat the set width */
+  object-fit: contain;
   max-width: 100%;
   max-height: 100%;
 }
 
 .art.flip .flip-front img.front-icon.pixel {
   image-rendering: pixelated;
+}
+
+/* Gen IX's renders are bigger than the front; inset them like the artwork. */
+.art.flip .flip-front img.front-icon:not(.pixel) {
+  max-width: 84%;
+  max-height: 84%;
 }

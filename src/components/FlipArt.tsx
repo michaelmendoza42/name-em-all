@@ -3,6 +3,7 @@ import type { FrontIcon, SpriteSlide } from "../lib/sprites";
 import "./flip.css";
 
 const BASE = import.meta.env.BASE_URL;
+const ICON_SCALE = 2;
 
 interface Props {
   id: number;
@@ -79,6 +80,8 @@ export function FlipArt({ id, name, icon, slides, index, onIndex, flipped, onFli
     <img
       src={icon ? `${BASE}${icon.path}` : `${BASE}art/${id}.webp`}
       className={icon ? `front-icon${icon.pixelArt ? " pixel" : ""}` : undefined}
+      // Icons draw at twice their native size (whole pixels, so they stay sharp).
+      onLoad={icon ? (e) => (e.currentTarget.style.width = `${e.currentTarget.naturalWidth * ICON_SCALE}px`) : undefined}
       alt={name}
       width={256}
       height={256}
