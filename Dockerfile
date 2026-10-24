@@ -6,7 +6,9 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
-RUN npm test && npm run build
+# The deploy checkout is made under umask 077, so files arrive mode 600;
+# nginx workers run unprivileged and would answer 403 without this.
+RUN npm test && npm run build && chmod -R a+rX dist
 
 FROM nginx:1.27-alpine AS runtime
 ARG REVISION=unknown
