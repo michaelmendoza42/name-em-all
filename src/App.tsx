@@ -21,6 +21,7 @@ import { focusAndGlide, isGliding } from "./lib/scroll";
 import { iconGenerations } from "./lib/sprites";
 import { DevTools } from "./components/DevTools";
 import { IconStylePicker } from "./components/IconStylePicker";
+import { LevelUp } from "./components/LevelUp";
 import { guessInputs, Tile } from "./components/Tile";
 
 const DATA_URL = `${import.meta.env.BASE_URL}pokedex.json`;
@@ -186,6 +187,14 @@ export function GenerationSection({
     if (offered > lastOffered.current) setJiggle(true);
     lastOffered.current = offered;
   }, [offered]);
+  // Level up when the last Pokémon is named during this visit (not on load).
+  const wasComplete = useRef(complete);
+  const [leveling, setLeveling] = useState(false);
+  useEffect(() => {
+    if (complete && !wasComplete.current) setLeveling(true);
+    if (!complete) setLeveling(false);
+    wasComplete.current = complete;
+  }, [complete]);
 
   // Collapsing from partway down a long section would leave the view far
   // below its header; pull the header back up under the top bar. Skipped for
@@ -203,7 +212,7 @@ export function GenerationSection({
       <header className={complete ? "generation-head complete" : "generation-head"}>
         {/* The header is a Gen 3 EXP bar: it fills as the generation is named. */}
         <div
-          className="exp-bar"
+          className={leveling ? "exp-bar leveling" : "exp-bar"}
           style={{ "--fill": `${ids.length ? (solved / ids.length) * 100 : 0}%` } as CSSProperties}
         >
           <h2 id={headingId}>
@@ -249,6 +258,9 @@ export function GenerationSection({
             )}
           </div>
         </div>
+        {leveling && (
+          <LevelUp name={group.region ?? group.title} count={ids.length} onDone={() => setLeveling(false)} />
+        )}
       </header>
       <ol className="wall" id={wallId} start={ids[0]} hidden={collapsed}>
         {group.species.map((s) => (

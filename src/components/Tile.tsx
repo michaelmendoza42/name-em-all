@@ -51,6 +51,12 @@ function adjacentGuess(from: HTMLInputElement, dir: 1 | -1): HTMLInputElement | 
   return inputs[inputs.indexOf(from) + dir];
 }
 
+// True when `input` is the last unsolved name in its generation, so solving
+// it completes the generation.
+function finishesGeneration(input: HTMLInputElement): boolean {
+  return input.closest(".wall")?.querySelectorAll("input[data-guess]").length === 1;
+}
+
 // Drop the start of `typed` that spells `added` (newly locked letters), so
 // revealing a letter you already typed doesn't double it.
 function stripTyped(typed: string, added: string): string {
@@ -112,8 +118,10 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
     if (full === undefined) return;
     // A longer accepted answer may still be on its way ("Nidoran F" while
     // typing "Nidoran Female"); keep focus here so the rest of it doesn't
-    // land in the next tile.
-    const next = answers.isExtendable(id, full) ? undefined : adjacentGuess(input, 1);
+    // land in the next tile. Finishing a generation also stays put, so its
+    // level-up plays out before the next generation's cards.
+    const next =
+      answers.isExtendable(id, full) || finishesGeneration(input) ? undefined : adjacentGuess(input, 1);
     setJustSolved(true);
     store.solve(id);
     if (next) focusAndGlide(next);

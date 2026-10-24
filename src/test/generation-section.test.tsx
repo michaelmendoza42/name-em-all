@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { GenerationSection, JumpToNext } from "../App";
 import { guessInputs } from "../components/Tile";
 import { buildAnswerIndex } from "../lib/answers";
@@ -21,6 +22,48 @@ describe("GenerationSection", () => {
     expect(head().classList.contains("complete")).toBe(false);
     act(() => store.solve(last));
     expect(head().classList.contains("complete")).toBe(true);
+  });
+});
+
+describe("GenerationSection level-up", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("plays when the last Pokémon is named, then closes by itself", () => {
+    vi.useFakeTimers();
+    const store = new ProgressStore(new MemoryStorage());
+    const { container } = render(<GenerationSection group={gen1} store={store} answers={answers} iconStyles={[]} />);
+    const box = () => container.querySelector(".level-up-box");
+    act(() => store.solveMany(gen1.species.map((s) => s.id)));
+    expect(box()).not.toBeNull();
+    expect(box()!.textContent).toContain("KANTO POKéDEX complete!");
+    // Each typed character schedules the next, so let React render in between.
+    for (let t = 0; t < 12000; t += 100) act(() => void vi.advanceTimersByTime(100));
+    expect(box()).toBeNull();
+  });
+
+  it("doesn't play for a generation already complete on load", () => {
+    const store = new ProgressStore(new MemoryStorage());
+    store.solveMany(gen1.species.map((s) => s.id));
+    const { container } = render(<GenerationSection group={gen1} store={store} answers={answers} iconStyles={[]} />);
+    expect(container.querySelector(".level-up-box")).toBeNull();
+  });
+
+  it("keeps focus on the last card instead of moving to the next generation", async () => {
+    const store = new ProgressStore(new MemoryStorage());
+    const [gen1Group, gen2Group] = groupByGeneration(dataset.species);
+    render(
+      <>
+        <GenerationSection group={gen1Group} store={store} answers={answers} iconStyles={[]} />
+        {gen2Group && <GenerationSection group={gen2Group} store={store} answers={answers} iconStyles={[]} />}
+      </>,
+    );
+    const [last, ...rest] = [...gen1Group.species].reverse();
+    act(() => store.solveMany(rest.map((s) => s.id)));
+    const user = userEvent.setup();
+    await user.click(guessInputs()[0]);
+    await user.keyboard(last.name);
+    expect(store.get(last.id).solved).toBe(true);
+    expect(document.activeElement?.textContent).toContain(last.name);
   });
 });
 
