@@ -16,21 +16,67 @@ import { loadDataset, type Dataset } from "./lib/dataset";
 import { groupByGeneration, romanGeneration, type GenerationGroup } from "./lib/generations";
 import { isCollapsed, setCollapsed as saveCollapsed } from "./lib/collapsed";
 import { getIconStyle, setIconStyle as saveIconStyle, unlockedIconStyles } from "./lib/iconStyle";
-import { STORAGE_KEY, type ProgressStore } from "./lib/progress";
-import { focusAndGlide, isGliding } from "./lib/scroll";
+import {
+  flatOrder,
+  hardOrder,
+  hardRunSeed,
+  type Lookalikes,
+  MODE_KEY,
+  type Mode,
+  modeFromPath,
+  modeInfo,
+  parseLookalikes,
+  saveMode,
+  savedMode,
+  startHardRun,
+} from "./lib/modes";
+import { browserStorage, type ProgressStore } from "./lib/progress";
+import { focusAndGlide, glideToTop, isGliding } from "./lib/scroll";
 import { iconGenerations } from "./lib/sprites";
 import { DevTools } from "./components/DevTools";
 import { IconStylePicker } from "./components/IconStylePicker";
 import { LevelUp } from "./components/LevelUp";
 import { guessInputs, Tile } from "./components/Tile";
 
-const DATA_URL = `${import.meta.env.BASE_URL}pokedex.json`;
+const BASE = import.meta.env.BASE_URL;
+const DATA_URL = `${BASE}pokedex.json`;
+const LOOKALIKES_URL = `${BASE}lookalikes.json`;
 const fmt = new Intl.NumberFormat("en-US");
 
 type Load = { state: "loading" } | { state: "error"; message: string } | { state: "ready"; data: Dataset };
 
-export function App({ store }: { store: ProgressStore }) {
+export type Stores = Record<Mode, ProgressStore>;
+
+export function App({ stores }: { stores: Stores }) {
   const [load, setLoad] = useState<Load>({ state: "loading" });
+  // The saved mode wins over the URL; a link to the other mode's path asks
+  // whether to switch instead.
+  const [mode, setMode] = useState(() => savedMode(browserStorage()));
+  const [asking, setAsking] = useState<Mode | null>(() => {
+    const wanted = modeFromPath(window.location.pathname, BASE);
+    return wanted === savedMode(browserStorage()) ? null : wanted;
+  });
+  const store = stores[mode];
+
+  // The path always names the current mode (replaced, so Back leaves the app
+  // rather than flipping modes).
+  useEffect(() => {
+    const path = `${BASE}${modeInfo(mode).path}`;
+    if (window.location.pathname !== path) window.history.replaceState(null, "", path);
+  }, [mode]);
+
+  const switchTo = useCallback(
+    (next: Mode) => {
+      // Hard Mode always starts from zero, and leaving it erases it.
+      stores.hard.reset();
+      if (next === "hard") startHardRun(browserStorage());
+      saveMode(next, browserStorage());
+      setMode(next);
+      setAsking(null);
+      window.scrollTo(0, 0);
+    },
+    [stores],
+  );
 
   const fetchData = useCallback(() => {
     setLoad({ state: "loading" });
@@ -57,18 +103,25 @@ export function App({ store }: { store: ProgressStore }) {
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY || e.key === null) store.reload();
+      for (const s of Object.values(stores)) if (e.key === s.key || e.key === null) s.reload();
+      if (e.key === MODE_KEY || e.key === null) setMode(savedMode(browserStorage()));
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [store]);
+  }, [stores]);
 
   return (
     <>
       <header className="bar" ref={barRef}>
         <h1>Gotta Name 'Em All</h1>
+        {mode === "hard" && <span className="mode-badge">Hard Mode</span>}
         {load.state === "ready" && <Counter store={store} data={load.data} />}
-        <Menu store={store} data={load.state === "ready" ? load.data : undefined} />
+        <Menu
+          store={store}
+          mode={mode}
+          onSwitch={setAsking}
+          data={load.state === "ready" ? load.data : undefined}
+        />
       </header>
 
       <main>
@@ -81,9 +134,17 @@ export function App({ store }: { store: ProgressStore }) {
             </button>
           </div>
         )}
-        {load.state === "ready" && <Wall store={store} data={load.data} />}
+        {load.state === "ready" && <Wall key={mode} mode={mode} store={store} data={load.data} />}
       </main>
       {load.state === "ready" && <JumpToNext />}
+      {asking && asking !== mode && (
+        <ModeSwitch
+          to={asking}
+          named={load.state === "ready" ? stores.hard.solvedCount(load.data.species.map((s) => s.id)) : 0}
+          onCancel={() => setAsking(null)}
+          onConfirm={switchTo}
+        />
+      )}
 
       <footer className="credits">
         <p>
@@ -116,11 +177,42 @@ function Counter({ store, data }: { store: ProgressStore; data: Dataset }) {
   );
 }
 
-function Wall({ store, data }: { store: ProgressStore; data: Dataset }) {
+type LookalikesLoad = { state: "loading" } | { state: "error"; message: string } | { state: "ready"; data: Lookalikes };
+
+// Hard mode's order, fetched only when that wall is shown.
+function useLookalikes(enabled: boolean): LookalikesLoad | undefined {
+  const [load, setLoad] = useState<LookalikesLoad>({ state: "loading" });
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    fetch(LOOKALIKES_URL)
+      .then((res) => {
+        if (!res.ok) throw new Error(`server returned ${res.status}`);
+        return res.json();
+      })
+      .then(parseLookalikes)
+      .then(
+        (data) => live && setLoad({ state: "ready", data }),
+        (err: Error) => live && setLoad({ state: "error", message: err.message }),
+      );
+    return () => {
+      live = false;
+    };
+  }, [enabled]);
+  return enabled ? load : undefined;
+}
+
+function Wall({ mode, store, data }: { mode: Mode; store: ProgressStore; data: Dataset }) {
   const answers = useMemo(() => buildAnswerIndex(data.species), [data]);
   const epoch = useSyncExternalStore(
     useCallback((l: () => void) => store.subscribeAll(l), [store]),
     () => store.epoch,
+  );
+  const lookalikes = useLookalikes(mode === "hard");
+  // This run's arrangement: the canonical one on a first run.
+  const order = useMemo(
+    () => (lookalikes?.state === "ready" ? hardOrder(lookalikes.data, hardRunSeed(browserStorage())) : undefined),
+    [lookalikes],
   );
   const groups = useMemo(() => groupByGeneration(data.species), [data]);
   // Completed generations, as a string so the snapshot is stable between changes.
@@ -140,6 +232,45 @@ function Wall({ store, data }: { store: ProgressStore; data: Dataset }) {
       ),
     [completed, groups],
   );
+  // Generations already complete when the wall first showed: they sit in
+  // their sections quietly; ones completed since arrive with a level-up.
+  const completedAtStart = useRef(completed);
+  if (lookalikes?.state === "loading") return <p className="status">Loading Hard Mode…</p>;
+  if (lookalikes?.state === "error")
+    return (
+      <p className="status error" role="alert">
+        Couldn't load Hard Mode's order ({lookalikes.message}).
+      </p>
+    );
+  if (lookalikes?.state === "ready") {
+    const done = new Set(completed ? completed.split(",").map(Number) : []);
+    const before = new Set(completedAtStart.current.split(",").map(Number));
+    // Solved cards stay in the wall until their whole generation is named.
+    const wall = flatOrder(data, order!).filter((s) => !done.has(s.generation));
+    return (
+      <div key={epoch}>
+        {wall.length > 0 && (
+          <ol className="wall flat" aria-label="Hard Mode wall">
+            {wall.map((s) => (
+              <Tile key={s.id} species={s} store={store} answers={answers} anonymous noHints />
+            ))}
+          </ol>
+        )}
+        {groups
+          .filter((g) => done.has(g.generation))
+          .map((g) => (
+            <GenerationSection
+              key={g.generation}
+              group={g}
+              store={store}
+              answers={answers}
+              iconStyles={iconStyles}
+              arriving={!before.has(g.generation)}
+            />
+          ))}
+      </div>
+    );
+  }
   return (
     <div key={epoch}>
       {groups.map((g) => (
@@ -154,11 +285,14 @@ export function GenerationSection({
   store,
   answers,
   iconStyles,
+  arriving = false,
 }: {
   group: GenerationGroup;
   store: ProgressStore;
   answers: AnswerIndex;
   iconStyles: readonly number[]; // unlocked icon styles, by generation
+  // Just completed in Hard Mode: glide to it and level up as it appears.
+  arriving?: boolean;
 }) {
   const ids = useMemo(() => group.species.map((s) => s.id), [group]);
   const solved = useSyncExternalStore(
@@ -188,13 +322,17 @@ export function GenerationSection({
     lastOffered.current = offered;
   }, [offered]);
   // Level up when the last Pokémon is named during this visit (not on load).
-  const wasComplete = useRef(complete);
+  const wasComplete = useRef(complete && !arriving);
   const [leveling, setLeveling] = useState(false);
   useEffect(() => {
     if (complete && !wasComplete.current) setLeveling(true);
     if (!complete) setLeveling(false);
     wasComplete.current = complete;
   }, [complete]);
+
+  useEffect(() => {
+    if (arriving && sectionRef.current) glideToTop(sectionRef.current);
+  }, [arriving]);
 
   // Collapsing from partway down a long section would leave the view far
   // below its header; pull the header back up under the top bar. Skipped for
@@ -360,7 +498,17 @@ const KANTO_IDS = Array.from({ length: 151 }, (_, i) => i + 1);
 type Confirming = null | "reset" | "oath";
 
 // Rarely needed actions live behind a "⋯" menu so Reset isn't one click away.
-export function Menu({ store, data }: { store: ProgressStore; data?: Dataset }) {
+export function Menu({
+  store,
+  mode = "dex",
+  onSwitch,
+  data,
+}: {
+  store: ProgressStore;
+  mode?: Mode;
+  onSwitch?: (mode: Mode) => void; // asks before switching to the other mode
+  data?: Dataset;
+}) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState<Confirming>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -414,7 +562,11 @@ export function Menu({ store, data }: { store: ProgressStore; data?: Dataset }) 
           <p className="menu-note">Progress is saved in this browser only.</p>
           {confirming === "reset" ? (
             <div className="confirm" role="group" aria-label="Confirm reset">
-              <p>Erase all progress? This can't be undone.</p>
+              <p>
+                {mode === "dex"
+                  ? "Erase all Pokédex progress? This can't be undone."
+                  : `Erase all ${modeInfo(mode).label} progress? This can't be undone.`}
+              </p>
               <div className="confirm-actions">
                 <button type="button" onClick={() => setConfirming(null)} autoFocus>
                   Cancel
@@ -433,15 +585,36 @@ export function Menu({ store, data }: { store: ProgressStore; data?: Dataset }) 
             </div>
           ) : (
             <>
+              {onSwitch && (
+                <button
+                  type="button"
+                  className="menu-item"
+                  onClick={() => {
+                    close(false);
+                    onSwitch(mode === "dex" ? "hard" : "dex");
+                  }}
+                  autoFocus
+                >
+                  {mode === "dex" ? "Hard Mode…" : "Back to the Pokédex…"}
+                </button>
+              )}
+              {/* Hard Mode is meant to be hard: no sworn shortcuts. */}
+              {mode === "dex" && (
+                <button
+                  type="button"
+                  className={kantoDone ? "menu-item done" : "menu-item"}
+                  onClick={() => setConfirming("oath")}
+                  autoFocus={!onSwitch}
+                >
+                  {kantoDone ? "Original 151: sworn & notarized ✓" : "Fill in the original 151…"}
+                </button>
+              )}
               <button
                 type="button"
-                className={kantoDone ? "menu-item done" : "menu-item"}
-                onClick={() => setConfirming("oath")}
-                autoFocus
+                className="menu-item"
+                onClick={() => setConfirming("reset")}
+                autoFocus={!onSwitch && mode !== "dex"}
               >
-                {kantoDone ? "Original 151: sworn & notarized ✓" : "Fill in the original 151…"}
-              </button>
-              <button type="button" className="menu-item" onClick={() => setConfirming("reset")}>
                 Reset progress…
               </button>
               {import.meta.env.DEV && data && <DevTools store={store} data={data} />}
@@ -461,6 +634,69 @@ export function Menu({ store, data }: { store: ProgressStore; data?: Dataset }) 
         />
       )}
     </div>
+  );
+}
+
+// The one door between modes. Going hard starts from zero; going back erases
+// the Hard Mode run, so switching can never carry Pokédex lookups across.
+// Portaled to <body> for the same reason as the oath below.
+function ModeSwitch({
+  to,
+  named,
+  onCancel,
+  onConfirm,
+}: {
+  to: Mode;
+  named: number; // Pokémon named in Hard Mode so far
+  onCancel: () => void;
+  onConfirm: (mode: Mode) => void;
+}) {
+  const titleId = useId();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+  return createPortal(
+    <div className="oath-backdrop">
+      <div className="oath mode-switch" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        {to === "hard" ? (
+          <>
+            <h2 id={titleId}>Switch to Hard Mode?</h2>
+            <p>Every Pokémon on one wall. No numbers, no generations, no hints.</p>
+            <p>
+              <strong>Hard Mode starts from zero.</strong> Your Pokédex progress doesn't count toward it; it's kept
+              aside and comes back if you leave.
+            </p>
+            <p>
+              <strong>Leaving Hard Mode erases everything you've named in it.</strong>
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 id={titleId}>Leave Hard Mode?</h2>
+            <p>
+              <strong>
+                This erases {named === 1 ? "the 1 Pokémon" : `all ${fmt.format(named)} Pokémon`} you've named in Hard
+                Mode.
+              </strong>{" "}
+              It can't be undone. Your Pokédex progress from before comes back.
+            </p>
+          </>
+        )}
+        <div className="confirm-actions">
+          <button type="button" onClick={onCancel} autoFocus>
+            {to === "hard" ? "Stay in the Pokédex" : "Keep going"}
+          </button>
+          <button type="button" className={to === "hard" ? "primary" : "danger"} onClick={() => onConfirm(to)}>
+            {to === "hard" ? "Start Hard Mode" : "Erase & leave"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

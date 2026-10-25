@@ -1,5 +1,6 @@
 // Per-Pokémon progress, persisted to localStorage under stable National Dex
-// numbers (never grid positions).
+// numbers (never grid positions). Each wall mode keeps its own save under its
+// own key (see modes.ts); STORAGE_KEY is the Pokédex wall's.
 //
 // Stored shape (version 1):
 //   { "version": 1, "pokemon": { "25": { "solved": true, "artwork": false, "letters": 3 } } }
@@ -53,7 +54,10 @@ export class ProgressStore {
   // bumped on reset so the wall can clear unsaved typed guesses
   epoch = 0;
 
-  constructor(private storage: Storage | null) {
+  constructor(
+    private storage: Storage | null,
+    readonly key = STORAGE_KEY,
+  ) {
     this.map = this.read();
   }
 
@@ -64,7 +68,7 @@ export class ProgressStore {
     }
     let text: string | null;
     try {
-      text = this.storage.getItem(STORAGE_KEY);
+      text = this.storage.getItem(this.key);
     } catch {
       this.persistent = false;
       return {};
@@ -80,7 +84,7 @@ export class ProgressStore {
       // Unreadable or unknown-version save: keep a copy rather than silently
       // overwriting it on the next change.
       try {
-        this.storage.setItem(`${STORAGE_KEY}:unreadable-backup`, text);
+        this.storage.setItem(`${this.key}:unreadable-backup`, text);
       } catch {
         /* nothing more we can do */
       }
@@ -92,7 +96,7 @@ export class ProgressStore {
   private write() {
     if (!this.storage) return;
     try {
-      this.storage.setItem(STORAGE_KEY, JSON.stringify({ version: SCHEMA_VERSION, pokemon: this.map }));
+      this.storage.setItem(this.key, JSON.stringify({ version: SCHEMA_VERSION, pokemon: this.map }));
       this.persistent = true;
     } catch {
       this.persistent = false;
@@ -159,7 +163,7 @@ export class ProgressStore {
     this.epoch++;
     if (this.storage) {
       try {
-        this.storage.removeItem(STORAGE_KEY);
+        this.storage.removeItem(this.key);
         this.persistent = true;
       } catch {
         this.persistent = false;

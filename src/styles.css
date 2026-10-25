@@ -93,6 +93,16 @@ input {
   letter-spacing: -0.01em;
 }
 
+/* Says which mode you're in; switching lives in the ⋯ menu. */
+.mode-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .counter {
   margin: 0;
   color: var(--muted);
@@ -200,7 +210,8 @@ input {
   cursor: pointer;
 }
 
-.bar button.danger {
+.bar button.danger,
+.oath button.danger {
   border-color: var(--danger);
   color: var(--danger);
   font-weight: 600;
@@ -411,6 +422,11 @@ main {
   gap: 12px;
 }
 
+/* Hard mode: one wall with no section header above it. */
+.wall.flat {
+  padding-top: var(--gutter);
+}
+
 .wall[hidden] {
   display: none;
 }
@@ -617,6 +633,12 @@ main {
   transform: translateY(22px); /* 6px flex gap + 22px = 28px */
 }
 
+/* Hard mode has no hint row; keep its space so the name box sits where it
+   does on every other card. */
+.answer.no-hints {
+  min-height: 70px; /* name box 28px + 6px gap + hint row 36px */
+}
+
 .hints {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -814,6 +836,16 @@ main {
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 16px 48px rgb(0 0 0 / 0.3);
+}
+
+/* The mode switch confirm: the oath's box without its legal-form rows. */
+.oath.mode-switch {
+  grid-template-rows: none;
+}
+
+.mode-switch p {
+  margin: 0;
+  line-height: 1.45;
 }
 
 .oath-form {

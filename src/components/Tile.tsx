@@ -30,6 +30,10 @@ interface Props {
   // and the unlocked generations its fallbacks may use.
   iconGen?: number;
   iconStyles?: readonly number[];
+  // Hide the dex number until solved (it would give the answer away in hard mode).
+  anonymous?: boolean;
+  // No hint menu (hard mode).
+  noHints?: boolean;
 }
 
 function useProgress(store: ProgressStore, id: number) {
@@ -52,9 +56,11 @@ function adjacentGuess(from: HTMLInputElement, dir: 1 | -1): HTMLInputElement | 
 }
 
 // True when `input` is the last unsolved name in its generation, so solving
-// it completes the generation.
+// it completes the generation. Looks across the page, since Hard Mode's wall
+// mixes generations.
 function finishesGeneration(input: HTMLInputElement): boolean {
-  return input.closest(".wall")?.querySelectorAll("input[data-guess]").length === 1;
+  const gen = input.closest<HTMLElement>("[data-gen]")?.dataset.gen;
+  return document.querySelectorAll(`[data-gen="${gen}"] input[data-guess]`).length === 1;
 }
 
 // Drop the start of `typed` that spells `added` (newly locked letters), so
@@ -68,7 +74,7 @@ function stripTyped(typed: string, added: string): string {
   return typed;
 }
 
-export const Tile = memo(function Tile({ species, store, answers, iconGen, iconStyles }: Props) {
+export const Tile = memo(function Tile({ species, store, answers, iconGen, iconStyles, anonymous, noHints }: Props) {
   const { id, name, types } = species;
   const progress = useProgress(store, id);
   const [guess, setGuess] = useState("");
@@ -89,7 +95,8 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
   const [hintsOpen, setHintsOpen] = useState(false);
   const nameRef = useRef<HTMLParagraphElement>(null);
   const number = `#${String(id).padStart(4, "0")}`;
-  const label = `Pokémon ${number}`;
+  const hideNumber = anonymous && !progress.solved;
+  const label = hideNumber ? "this mystery Pokémon" : `Pokémon ${number}`;
   const letterTotal = useMemo(() => revealableCount(name), [name]);
 
   const showArt = progress.solved || progress.artwork;
@@ -199,6 +206,7 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
   return (
     <li
       ref={tileRef}
+      data-gen={species.generation}
       className={`tile${progress.solved ? " solved" : ""}${justSolved ? " just-solved" : ""}${engaged || hintsOpen ? " engaged" : ""}`}
       onPointerDown={progress.solved ? undefined : () => setEngaged(true)}
       onBlur={(e) => {
@@ -206,7 +214,7 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
         if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setHintsOpen(false);
       }}
     >
-      <span className="dex">{number}</span>
+      {!hideNumber && <span className="dex">{number}</span>}
       {progress.solved ? (
         <FlipArt
           id={id}
@@ -249,7 +257,7 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
           </div>
         </DexFooter>
       ) : (
-        <div className={`answer${hintsOpen ? " open" : ""}`}>
+        <div className={`answer${hintsOpen ? " open" : ""}${noHints ? " no-hints" : ""}`}>
           {/* Clicking anywhere in the box (including the locked letters) focuses the input. */}
           <div className={`guess${prefix ? " has-prefix" : ""}`} onClick={() => inputRef.current?.focus()}>
             <label htmlFor={inputId} className="sr-only">
@@ -283,14 +291,16 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
               </span>
             )}
           </div>
-          <HintMenu
-            tileLabel={label}
-            options={hintOptions}
-            open={hintsOpen}
-            onOpenChange={setHintsOpen}
-            toggleRef={hintToggleRef}
-            onExitUp={() => inputRef.current?.focus()}
-          />
+          {!noHints && (
+            <HintMenu
+              tileLabel={label}
+              options={hintOptions}
+              open={hintsOpen}
+              onOpenChange={setHintsOpen}
+              toggleRef={hintToggleRef}
+              onExitUp={() => inputRef.current?.focus()}
+            />
+          )}
         </div>
       )}
     </li>

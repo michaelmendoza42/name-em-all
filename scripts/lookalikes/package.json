@@ -1,0 +1,13 @@
+{
+  "name": "name-em-all-lookalikes",
+  "private": true,
+  "description": "Builds public/lookalikes.json. Kept apart from the app: its model runtime is large and only needed when silhouettes change.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.1",
+    "sharp": "^0.35.5"
+  }
+}

@@ -80,3 +80,12 @@ describe("Menu", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
+
+describe("Menu in Hard Mode", () => {
+  it("has no original-151 fill-in", async () => {
+    render(<Menu store={new ProgressStore(new MemoryStorage(), `${STORAGE_KEY}:hard`)} mode="hard" />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "More options" }));
+    expect(screen.getByRole("button", { name: /Reset progress/ })).toBeTruthy();
+    expect(screen.queryByText(/original 151/)).toBeNull();
+  });
+});

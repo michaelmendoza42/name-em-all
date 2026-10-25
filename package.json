@@ -8,6 +8,8 @@
     "build": "tsc -p . && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "data": "node scripts/build-data.mjs",
+    "lookalikes": "node scripts/lookalikes/build.mjs",
+    "themes": "node scripts/lookalikes/themes.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p ."
   },

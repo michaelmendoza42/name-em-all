@@ -229,3 +229,20 @@ describe("keyboard flow", () => {
     expect(tile("Ivysaur").classList.contains("engaged")).toBe(true);
   });
 });
+
+describe("Tile in hard mode", () => {
+  it("has no hints and no dex number until solved", async () => {
+    const species = byName("Pikachu");
+    const store = new ProgressStore(new MemoryStorage());
+    const { container } = render(
+      <ul>
+        <Tile species={species} store={store} answers={answers} anonymous noHints />
+      </ul>,
+    );
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(container.querySelector(".dex")).toBeNull();
+    expect(container.textContent).not.toContain("#0025");
+    await userEvent.setup().type(screen.getByLabelText("Name of this mystery Pokémon"), "pikachu");
+    expect(container.querySelector(".dex")?.textContent).toBe("#0025");
+  });
+});

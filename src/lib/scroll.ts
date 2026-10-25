@@ -34,14 +34,14 @@ export function scrollDuration(distance: number, viewport: number): number {
   return Math.round(Math.min(MAX_MS, Math.max(MIN_MS, MIN_MS + 180 * Math.log2(1 + screens))));
 }
 
-// How far the window must scroll for `el` to sit fully in view below the
-// sticky top bar (html's scroll-padding-top), or 0 if it already does.
-function scrollDelta(el: Element): number {
+// How far the window must scroll for `el` to sit centred below the sticky
+// top bar (html's scroll-padding-top), like scrollIntoView({ block: "center" }).
+// With `ifHidden`, 0 when it's already fully in view there.
+function scrollDelta(el: Element, ifHidden = false): number {
   const rect = el.getBoundingClientRect();
   const padTop = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
   const viewH = window.innerHeight;
-  if (rect.top >= padTop && rect.bottom <= viewH) return 0;
-  // Center the tile in the space below the bar, like scrollIntoView({ block: "center" }).
+  if (ifHidden && rect.top >= padTop && rect.bottom <= viewH) return 0;
   return rect.top + rect.height / 2 - (padTop + (viewH - padTop) / 2);
 }
 
@@ -49,7 +49,21 @@ function scrollDelta(el: Element): number {
 // into view if it isn't already. Wheel, touch or keys cancel the glide.
 export function focusAndGlide(input: HTMLElement) {
   input.focus({ preventScroll: true });
-  const delta = scrollDelta(input.closest("li") ?? input);
+  const tile = input.closest("li") ?? input;
+  if (scrollDelta(tile, true)) glide(() => scrollDelta(tile));
+}
+
+// Glides the window until `el`'s top sits just under the sticky top bar.
+export function glideToTop(el: Element) {
+  const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bar-h")) || 0;
+  glide(() => el.getBoundingClientRect().top - barH);
+}
+
+// `remaining` says how far is left to scroll. It's asked again every frame,
+// so the glide still lands if the page above the target changes height
+// mid-way (e.g. a finished generation leaving Hard Mode's wall).
+function glide(remaining: () => number) {
+  const delta = remaining();
   if (!delta) return;
   stop();
   lastGlide = performance.now();
@@ -62,7 +76,8 @@ export function focusAndGlide(input: HTMLElement) {
   const start = performance.now();
   const step = (now: number) => {
     const t = Math.min(1, (now - start) / duration);
-    window.scrollTo(0, from + delta * easeInOutCubic(t));
+    const to = window.scrollY + remaining();
+    window.scrollTo(0, from + (to - from) * easeInOutCubic(t));
     lastGlide = now;
     if (t < 1) frame = requestAnimationFrame(step);
     else stop();
