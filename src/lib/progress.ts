@@ -2,23 +2,21 @@
 // numbers (never grid positions).
 //
 // Stored shape (version 1):
-//   { "version": 1, "pokemon": { "25": { "solved": true, "artwork": false, "types": 1, "letters": 3 } } }
+//   { "version": 1, "pokemon": { "25": { "solved": true, "artwork": false, "letters": 3 } } }
 
 export const STORAGE_KEY = "wtp-ultimate:progress";
 export const SCHEMA_VERSION = 1;
-const MAX_TYPES = 2;
 const MAX_LETTERS = 64;
 
 export interface PokemonProgress {
   solved: boolean;
   artwork: boolean; // artwork revealed by hint
-  types: number; // type hints used (0–2)
   letters: number; // letters revealed
 }
 
 export type ProgressMap = Record<string, PokemonProgress>;
 
-export const EMPTY: PokemonProgress = Object.freeze({ solved: false, artwork: false, types: 0, letters: 0 });
+export const EMPTY: PokemonProgress = Object.freeze({ solved: false, artwork: false, letters: 0 });
 
 function clampInt(value: unknown, max: number): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(0, Math.floor(value))) : 0;
@@ -37,10 +35,9 @@ export function sanitizeProgress(raw: unknown): ProgressMap {
     const entry: PokemonProgress = {
       solved: v.solved === true,
       artwork: v.artwork === true,
-      types: clampInt(v.types, MAX_TYPES),
       letters: clampInt(v.letters, MAX_LETTERS),
     };
-    if (entry.solved || entry.artwork || entry.types || entry.letters) out[key] = entry;
+    if (entry.solved || entry.artwork || entry.letters) out[key] = entry;
   }
   return out;
 }
@@ -150,11 +147,6 @@ export class ProgressStore {
   revealArtwork(id: number) {
     const cur = this.get(id);
     if (!cur.artwork) this.set(id, { ...cur, artwork: true });
-  }
-
-  revealType(id: number, available: number) {
-    const cur = this.get(id);
-    if (cur.types < Math.min(available, MAX_TYPES)) this.set(id, { ...cur, types: cur.types + 1 });
   }
 
   revealLetter(id: number, available: number) {

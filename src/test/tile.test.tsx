@@ -81,24 +81,14 @@ describe("Tile", () => {
     expect((screen.getByRole("button", { name: `Artwork revealed for ${label}` }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("Reveal Type shows one type per click for a dual type", async () => {
+  it("offers only Artwork and Letter hints, with no types shown before solving", async () => {
     const { user, label } = setup("Bulbasaur");
     await openHints(user, label);
-    const types = () => Array.from(document.querySelectorAll(".type")).map((e) => e.textContent);
-    await user.click(screen.getByRole("button", { name: `Reveal Type for ${label}` }));
-    expect(types()).toEqual(["grass"]);
-    await user.click(screen.getByRole("button", { name: `Reveal Type for ${label}` }));
-    expect(types()).toEqual(["grass", "poison"]);
-    expect((screen.getByRole("button", { name: `All types revealed for ${label}` }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("Reveal Type on a single type shows one type, then is done", async () => {
-    const { user, label } = setup("Pikachu");
-    await openHints(user, label);
-    await user.click(screen.getByRole("button", { name: `Reveal Type for ${label}` }));
-    expect(document.querySelectorAll(".type")).toHaveLength(1);
-    expect(screen.getByText("electric")).toBeTruthy();
-    expect((screen.getByRole("button", { name: `All types revealed for ${label}` }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getAllByRole("button", { name: /^Reveal/ }).map((b) => b.getAttribute("aria-label"))).toEqual([
+      `Reveal artwork for ${label}`,
+      `Reveal Letter for ${label}`,
+    ]);
+    expect(document.querySelectorAll(".type")).toHaveLength(0);
   });
 
   it("Reveal Letter locks one more letter into the input per click and solves on the last", async () => {
@@ -209,7 +199,7 @@ describe("keyboard flow", () => {
     await user.keyboard("{Enter}");
     expect(active()).toBe("Reveal artwork for Pokémon #0001");
     await user.keyboard("{ArrowDown}");
-    expect(active()).toBe("Reveal Type for Pokémon #0001");
+    expect(active()).toBe("Reveal Letter for Pokémon #0001");
     await user.keyboard("{Escape}");
     expect(active()).toBe("Hint for Pokémon #0001");
     expect(screen.queryByRole("button", { name: /Reveal/ })).toBeNull();
@@ -221,7 +211,7 @@ describe("keyboard flow", () => {
     const { input, user } = setupWall(["Bulbasaur", "Ivysaur"]);
     expect(screen.queryByRole("button", { name: /Reveal/ })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Hint for Pokémon #0001" }));
-    expect(screen.getByRole("button", { name: "Reveal Type for Pokémon #0001" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Reveal Letter for Pokémon #0001" })).toBeTruthy();
     // The Hint circle spreads into the row: it's gone while the hints show.
     expect(screen.queryByRole("button", { name: "Hint for Pokémon #0001" })).toBeNull();
     await user.click(input("Ivysaur"));

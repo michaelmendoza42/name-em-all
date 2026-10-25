@@ -95,7 +95,7 @@ everything except letters and digits, so `mr mime`, `Flabebe` and
 Key `wtp-ultimate:progress`:
 
 ```json
-{ "version": 1, "pokemon": { "25": { "solved": true, "artwork": false, "types": 1, "letters": 3 } } }
+{ "version": 1, "pokemon": { "25": { "solved": true, "artwork": false, "letters": 3 } } }
 ```
 
 Keys are National Dex numbers. Malformed values are dropped or clamped.

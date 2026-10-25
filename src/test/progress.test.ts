@@ -18,33 +18,21 @@ describe("ProgressStore", () => {
     a.solve(25);
     expect(saved().pokemon["25"].solved).toBe(true);
     a.revealArtwork(1);
-    a.revealType(1, 2);
     a.revealLetter(1, 9);
     a.revealLetter(1, 9);
 
     const b = new ProgressStore(storage);
-    expect(b.get(25)).toEqual({ solved: true, artwork: false, types: 0, letters: 0 });
-    expect(b.get(1)).toEqual({ solved: false, artwork: true, types: 1, letters: 2 });
+    expect(b.get(25)).toEqual({ solved: true, artwork: false, letters: 0 });
+    expect(b.get(1)).toEqual({ solved: false, artwork: true, letters: 2 });
   });
 
   it("keeps hints independent per Pokémon", () => {
     const s = new ProgressStore(storage);
     s.revealLetter(4, 10);
-    s.revealType(7, 1);
-    expect(s.get(4).types).toBe(0);
+    s.revealArtwork(7);
+    expect(s.get(4).artwork).toBe(false);
     expect(s.get(7).letters).toBe(0);
     expect(s.get(1)).toEqual(EMPTY);
-  });
-
-  it("caps type hints at the species' type count", () => {
-    const s = new ProgressStore(storage);
-    s.revealType(25, 1);
-    s.revealType(25, 1);
-    expect(s.get(25).types).toBe(1);
-    s.revealType(1, 2);
-    s.revealType(1, 2);
-    s.revealType(1, 2);
-    expect(s.get(1).types).toBe(2);
   });
 
   it("caps letter hints at the name length", () => {
@@ -82,7 +70,7 @@ describe("ProgressStore", () => {
   it("reset clears memory and storage", () => {
     const s = new ProgressStore(storage);
     s.solve(1);
-    s.revealType(2, 2);
+    s.revealLetter(2, 5);
     s.reset();
     expect(s.get(1)).toEqual(EMPTY);
     expect(storage.getItem(STORAGE_KEY)).toBeNull();
@@ -122,7 +110,7 @@ describe("sanitizeProgress", () => {
         version: 1,
         pokemon: {
           "1": { solved: true, artwork: "yes", types: 7, letters: -3 },
-          "2": { types: 1.9, letters: "4" },
+          "2": { artwork: true, letters: "4" },
           "0": { solved: true },
           abc: { solved: true },
           "3": null,
@@ -130,8 +118,8 @@ describe("sanitizeProgress", () => {
         },
       }),
     ).toEqual({
-      "1": { solved: true, artwork: false, types: 2, letters: 0 },
-      "2": { solved: false, artwork: false, types: 1, letters: 0 },
+      "1": { solved: true, artwork: false, letters: 0 },
+      "2": { solved: false, artwork: true, letters: 0 },
     });
   });
 

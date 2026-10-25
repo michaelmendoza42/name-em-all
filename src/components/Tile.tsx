@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { Species } from "../lib/dataset";
 import { normalizeAnswer, type AnswerIndex } from "../lib/answers";
-import { remainingPattern, revealableCount, revealedPrefix, visibleTypes } from "../lib/hints";
+import { remainingPattern, revealableCount, revealedPrefix } from "../lib/hints";
 import type { ProgressStore } from "../lib/progress";
 import { focusAndGlide } from "../lib/scroll";
 import { iconFor, spriteSlides } from "../lib/sprites";
@@ -93,8 +93,6 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
   const letterTotal = useMemo(() => revealableCount(name), [name]);
 
   const showArt = progress.solved || progress.artwork;
-  const typesShown = visibleTypes(types, progress.types);
-  const allTypes = progress.types >= types.length;
   const allLetters = progress.letters >= letterTotal;
   // Revealed letters sit locked at the start of the input; the user types the rest.
   const prefix = progress.solved ? "" : revealedPrefix(name, progress.letters);
@@ -181,14 +179,6 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
       onReveal: () => store.revealArtwork(id),
     },
     {
-      key: "type",
-      text: "Type",
-      done: allTypes,
-      label: allTypes ? `All types revealed for ${label}` : `Reveal Type for ${label}`,
-      title: allTypes ? "All types revealed" : "Reveal a type",
-      onReveal: () => store.revealType(id, types.length),
-    },
-    {
       key: "letter",
       text: "Letter",
       done: allLetters,
@@ -239,21 +229,11 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
             decoding="async"
             draggable={false}
           />
-          {typesShown.length > 0 && (
-            <div className="types overlay">
-              <span className="sr-only">Revealed types: </span>
-              {typesShown.map((t) => (
-                <span key={t} className={`type type-${t}`}>
-                  {t}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
       {/* Solved and unsolved tiles share one two-row layout so every card is
-          the same height: name or input, then types or hint buttons. */}
+          the same height: name or input, then types or the hints button. */}
       {progress.solved ? (
         <DexFooter id={id} name={name} flipped={flipped} generation={slides[slide]?.generation}>
           <p className="name" ref={nameRef} tabIndex={-1}>

@@ -25,10 +25,6 @@ export function letterMask(name: string, revealed: number): MaskChar[] {
   });
 }
 
-export function visibleTypes(types: readonly string[], revealed: number): readonly string[] {
-  return types.slice(0, Math.max(0, Math.min(revealed, types.length)));
-}
-
 // The revealed start of the name, locked in the input: the first `revealed`
 // letters plus any punctuation or spaces that follow them, up to the next
 // hidden letter. "Mr. Mime" with 2 revealed → "Mr. ".

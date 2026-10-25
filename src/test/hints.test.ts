@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { letterMask, remainingPattern, revealableCount, revealedPrefix, visibleTypes } from "../lib/hints";
+import { letterMask, remainingPattern, revealableCount, revealedPrefix } from "../lib/hints";
 import { byName } from "./fixtures";
 
 const render = (name: string, n: number) =>
@@ -41,23 +41,7 @@ describe("letter hints", () => {
   });
 });
 
-describe("type hints", () => {
-  it("reveals a dual type one at a time in slot order", () => {
-    const { types } = byName("Bulbasaur");
-    expect(types).toEqual(["grass", "poison"]);
-    expect(visibleTypes(types, 0)).toEqual([]);
-    expect(visibleTypes(types, 1)).toEqual(["grass"]);
-    expect(visibleTypes(types, 2)).toEqual(["grass", "poison"]);
-  });
-
-  it("never invents a second type for a single-type Pokémon", () => {
-    const { types } = byName("Pikachu");
-    expect(types).toEqual(["electric"]);
-    expect(visibleTypes(types, 1)).toEqual(["electric"]);
-    expect(visibleTypes(types, 2)).toEqual(["electric"]);
-    expect(visibleTypes(types, 99)).toEqual(["electric"]);
-  });
-
+describe("types", () => {
   it("uses current types for representative species", () => {
     expect(byName("Charizard").types).toEqual(["fire", "flying"]);
     expect(byName("Mewtwo").types).toEqual(["psychic"]);
