@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { Species } from "../lib/dataset";
 import { normalizeAnswer, type AnswerIndex } from "../lib/answers";
-import { remainingPattern, revealableCount, revealedPrefix } from "../lib/hints";
+import { gradeGuess, revealableCount, revealedPrefix, type GradeState } from "../lib/hints";
 import type { ProgressStore } from "../lib/progress";
 import { focusAndGlide } from "../lib/scroll";
 import { iconFor, spriteSlides } from "../lib/sprites";
@@ -77,7 +77,8 @@ function stripTyped(typed: string, added: string): string {
 export const Tile = memo(function Tile({ species, store, answers, iconGen, iconStyles, anonymous, noHints }: Props) {
   const { id, name, types } = species;
   const progress = useProgress(store, id);
-  const [guess, setGuess] = useState("");
+  // Whatever was left typed survives a reload (see ProgressStore drafts).
+  const [guess, setGuess] = useState(() => (store.get(id).solved ? "" : store.draft(id)));
   const [justSolved, setJustSolved] = useState(false);
   // Set when a solve should keep focus on this tile instead of advancing.
   const [holdFocus, setHoldFocus] = useState(false);
@@ -103,7 +104,26 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
   const allLetters = progress.letters >= letterTotal;
   // Revealed letters sit locked at the start of the input; the user types the rest.
   const prefix = progress.solved ? "" : revealedPrefix(name, progress.letters);
-  const remaining = progress.letters > 0 ? remainingPattern(name, progress.letters) : "";
+  const canCheck = normalizeAnswer(guess) !== "";
+  // Once Spellcheck is on, the guess is regraded live as it's typed. Only
+  // typed letters get colors; they're graded in place after any letters the
+  // Letter hint locked in, which stay plain.
+  const spellcheck = progress.spellcheck === true && !progress.solved;
+  const marks: Mark[] = useMemo(
+    () => (spellcheck ? gradeGuess(name, prefix + guess).slice(Array.from(prefix).length) : []),
+    [spellcheck, name, prefix, guess],
+  );
+  const tinted = marks.some((m) => m.state !== "plain");
+  const mirrorRef = useRef<HTMLSpanElement>(null);
+  // The colored copy sits under the input's (then invisible) text; keep it
+  // aligned when a long guess scrolls sideways.
+  const syncMirror = () => {
+    if (mirrorRef.current && inputRef.current)
+      mirrorRef.current.style.transform = `translateX(${-inputRef.current.scrollLeft}px)`;
+  };
+  useEffect(syncMirror);
+
+  useEffect(() => store.setDraft(id, progress.solved ? "" : guess), [store, id, guess, progress.solved]);
 
   useEffect(() => {
     if (holdFocus && progress.solved) nameRef.current?.focus();
@@ -202,6 +222,25 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
       },
     },
   ];
+  // Spellcheck only appears once there's a guess to grade, and stays (spent)
+  // once it's on.
+  if (canCheck || spellcheck) {
+    hintOptions.push({
+      key: "spellcheck",
+      text: "Spellcheck",
+      done: spellcheck,
+      label: spellcheck ? `Spellcheck is on for ${label}` : `Check your spelling letter by letter for ${label}`,
+      title: spellcheck ? "Spellcheck is on" : "Check your spelling letter by letter, as you type",
+      onReveal: () => {
+        store.spellcheck(id);
+        // Fold the row away so the result shows and typing carries on at the end.
+        setHintsOpen(false);
+        const input = inputRef.current;
+        input?.focus();
+        input?.setSelectionRange(input.value.length, input.value.length);
+      },
+    });
+  }
 
   return (
     <li
@@ -259,7 +298,10 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
       ) : (
         <div className={`answer${hintsOpen ? " open" : ""}${noHints ? " no-hints" : ""}`}>
           {/* Clicking anywhere in the box (including the locked letters) focuses the input. */}
-          <div className={`guess${prefix ? " has-prefix" : ""}`} onClick={() => inputRef.current?.focus()}>
+          <div
+            className={`guess${prefix ? " has-prefix" : ""}${tinted ? " wordle" : ""}`}
+            onClick={() => inputRef.current?.focus()}
+          >
             <label htmlFor={inputId} className="sr-only">
               Name of {label}
             </label>
@@ -268,26 +310,43 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
                 {prefix}
               </span>
             )}
-            <input
-              id={inputId}
-              ref={inputRef}
-              data-guess
-              onKeyDown={onInputKeyDown}
-              aria-keyshortcuts="Tab Shift+Tab ArrowDown"
-              aria-describedby={prefix ? `${inputId}-hint` : undefined}
-              value={guess}
-              onChange={onChange}
-              placeholder={!prefix ? "Who's that?" : remaining || "Enter ↵"}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              enterKeyHint="next"
-            />
+            <span className="field">
+              <input
+                id={inputId}
+                ref={inputRef}
+                data-guess
+                onKeyDown={onInputKeyDown}
+                aria-keyshortcuts="Tab Shift+Tab ArrowDown"
+                aria-describedby={
+                  [prefix && `${inputId}-hint`, tinted && `${inputId}-check`].filter(Boolean).join(" ") || undefined
+                }
+                value={guess}
+                onChange={onChange}
+                placeholder={prefix ? "" : "Who's that?"}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                enterKeyHint="next"
+                onScroll={syncMirror}
+                onSelect={syncMirror}
+              />
+              {tinted && (
+                <span className="mirror" aria-hidden="true">
+                  <span ref={mirrorRef}>
+                    <Marks marks={marks} />
+                  </span>
+                </span>
+              )}
+            </span>
             {prefix && (
               <span className="sr-only" id={`${inputId}-hint`}>
                 Starts with {prefix}
-                {remaining ? `, then ${remaining.replace(/_/g, " blank")}` : ". Every letter revealed; press Enter"}
+              </span>
+            )}
+            {tinted && (
+              <span className="sr-only" id={`${inputId}-check`}>
+                {spokenCheck(marks)}
               </span>
             )}
           </div>
@@ -306,3 +365,31 @@ export const Tile = memo(function Tile({ species, store, answers, iconGen, iconS
     </li>
   );
 });
+
+const GRADE_WORDS = {
+  hit: "right",
+  near: "elsewhere",
+  miss: "not in the name",
+} as const;
+
+type Mark = { char: string; state: GradeState };
+
+function spokenCheck(marks: Mark[]): string {
+  const said = marks
+    .filter((m) => m.state !== "plain")
+    .map((m) => `${m.char.toUpperCase()} ${GRADE_WORDS[m.state as keyof typeof GRADE_WORDS]}`);
+  return `Spellcheck: ${said.join("; ")}`;
+}
+
+// Typed letters in the name box, tinted by Spellcheck.
+function Marks({ marks }: { marks: Mark[] }) {
+  return marks.map((m, i) =>
+    m.state !== "plain" ? (
+      <span key={i} className={`mark g-${m.state}`}>
+        {m.char}
+      </span>
+    ) : (
+      m.char
+    ),
+  );
+}

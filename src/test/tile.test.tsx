@@ -99,7 +99,8 @@ describe("Tile", () => {
     const prefix = () => container.querySelector(".prefix")?.textContent ?? "";
     await user.click(btn());
     expect(prefix()).toBe("M");
-    expect(input().placeholder).toBe("__");
+    // Nothing hints at how many letters are left.
+    expect(input().placeholder).toBe("");
     expect(input().value).toBe("");
     await user.click(btn());
     expect(prefix()).toBe("Me");

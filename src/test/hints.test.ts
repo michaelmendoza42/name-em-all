@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { letterMask, remainingPattern, revealableCount, revealedPrefix } from "../lib/hints";
+import { letterMask, revealableCount, revealedPrefix } from "../lib/hints";
 import { byName } from "./fixtures";
 
 const render = (name: string, n: number) =>
@@ -53,21 +53,17 @@ describe("types", () => {
 describe("revealed prefix", () => {
   it("is empty until a letter is revealed", () => {
     expect(revealedPrefix("Pikachu", 0)).toBe("");
-    expect(remainingPattern("Pikachu", 0)).toBe("_______");
   });
 
   it("grows one letter per reveal and carries following punctuation", () => {
     expect(revealedPrefix("Pikachu", 3)).toBe("Pik");
-    expect(remainingPattern("Pikachu", 3)).toBe("____");
     expect(revealedPrefix("Mr. Mime", 2)).toBe("Mr. ");
-    expect(remainingPattern("Mr. Mime", 2)).toBe("____");
     expect(revealedPrefix("Ho-Oh", 1)).toBe("H");
     expect(revealedPrefix("Ho-Oh", 2)).toBe("Ho-");
   });
 
   it("is the whole name once every letter is revealed", () => {
     expect(revealedPrefix("Nidoran♀", 7)).toBe("Nidoran♀");
-    expect(remainingPattern("Nidoran♀", 7)).toBe("");
     expect(revealedPrefix("Mew", 9)).toBe("Mew");
   });
 });

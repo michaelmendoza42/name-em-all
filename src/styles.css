@@ -10,6 +10,9 @@
   --solved: #157f3b;
   --solved-bg: #e8f6ed;
   --danger: #b42318;
+  --grade-hit: #2f9e55;
+  --grade-near: #c9a227;
+  --grade-miss: #8a929c;
   --stage: radial-gradient(circle at 50% 45%, #ffffff 0%, #e9edf2 70%, #dfe4ea 100%);
   --focus: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
   color-scheme: light;
@@ -26,6 +29,9 @@
     --solved: #4cc27a;
     --solved-bg: #15291d;
     --danger: #ff6b5e;
+    --grade-hit: #2f8a4c;
+    --grade-near: #a8871c;
+    --grade-miss: #4b535d;
     /* Silhouettes are black, so the image stage stays light in dark mode too. */
     --stage: radial-gradient(circle at 50% 45%, #f2f4f7 0%, #cfd5dd 75%, #c3cad3 100%);
     color-scheme: dark;
@@ -569,6 +575,76 @@ main {
   letter-spacing: 0.12em;
 }
 
+/* The input sits in this wrapper so a colored copy of its text can lie
+   underneath after a Spellcheck check. */
+.guess .field {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+/* After a Spellcheck the name box turns Wordle-style: monospace capitals,
+   spaced out so each typed letter gets its own tile. The input's own text
+   goes invisible (its caret and selection stay) and the colored copy below
+   shows through. Letters locked in by the Letter hint stay plain. */
+.guess.wordle {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-transform: uppercase;
+}
+
+.guess.wordle input {
+  text-transform: uppercase; /* inputs don't inherit it */
+}
+
+.guess.wordle input,
+.guess.wordle .mirror,
+.guess.wordle .prefix {
+  letter-spacing: 0.4em;
+  font-weight: 600;
+}
+
+.guess.wordle input {
+  color: transparent;
+  caret-color: var(--text);
+}
+
+.guess .mirror {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: safe center;
+  padding: 3px 10px;
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: none;
+}
+
+.guess.has-prefix .mirror {
+  justify-content: flex-start;
+  padding-left: 0;
+}
+
+/* A tile behind each graded letter. Letter-spacing trails each glyph, so the
+   span is pulled left by half of it and the tile is drawn centered on the
+   glyph with a small gap to the next one, without changing any widths. */
+.mark {
+  --tile: var(--grade-miss);
+  padding: 2px 0 2px 0.2em;
+  margin-left: -0.2em;
+  color: #fff;
+  background: linear-gradient(var(--tile), var(--tile)) no-repeat 0.05em 0 / calc(100% - 0.3em) 100%;
+}
+
+.mark.g-hit {
+  --tile: var(--grade-hit);
+}
+
+.mark.g-near {
+  --tile: var(--grade-near);
+}
+
 .types {
   min-height: 28px;
   display: flex;
@@ -641,7 +717,8 @@ main {
 
 .hints {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Sized to the labels: Artwork, Letter, then the longer Spellcheck. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.3fr);
   align-items: end;
   gap: 4px;
   /* Name box (28px) + gap + this = the solved card's name and type rows. */

@@ -3,21 +3,31 @@
 // own key (see modes.ts); STORAGE_KEY is the Pokédex wall's.
 //
 // Stored shape (version 1):
-//   { "version": 1, "pokemon": { "25": { "solved": true, "artwork": false, "letters": 3 } } }
+//   { "version": 1, "pokemon": { "25": { "solved": true, "artwork": false, "letters": 3, "spellcheck": true } } }
+//
+// Typed-but-unsolved guesses live beside it under `${key}:drafts` as
+//   { "version": 1, "drafts": { "25": "pika" } }
+// so a half-typed name survives a reload, hint or no hint.
 
 export const STORAGE_KEY = "wtp-ultimate:progress";
 export const SCHEMA_VERSION = 1;
 const MAX_LETTERS = 64;
+const MAX_TEXT = 64;
 
 export interface PokemonProgress {
   solved: boolean;
   artwork: boolean; // artwork revealed by hint
   letters: number; // letters revealed
+  spellcheck?: true; // Spellcheck hint on: typed letters graded live
 }
 
 export type ProgressMap = Record<string, PokemonProgress>;
 
 export const EMPTY: PokemonProgress = Object.freeze({ solved: false, artwork: false, letters: 0 });
+
+function cleanText(value: unknown): string {
+  return typeof value === "string" ? Array.from(value).slice(0, MAX_TEXT).join("") : "";
+}
 
 function clampInt(value: unknown, max: number): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(0, Math.floor(value))) : 0;
@@ -31,14 +41,29 @@ export function sanitizeProgress(raw: unknown): ProgressMap {
   if (version !== SCHEMA_VERSION || !pokemon || typeof pokemon !== "object") return {};
   const out: ProgressMap = {};
   for (const [key, value] of Object.entries(pokemon)) {
-    if (!/^[1-9]\d{0,4}$/.test(key) || !value || typeof value !== "object") continue;
+    if (!ID_KEY.test(key) || !value || typeof value !== "object") continue;
     const v = value as Record<string, unknown>;
     const entry: PokemonProgress = {
       solved: v.solved === true,
       artwork: v.artwork === true,
       letters: clampInt(v.letters, MAX_LETTERS),
     };
-    if (entry.solved || entry.artwork || entry.letters) out[key] = entry;
+    if (v.spellcheck === true) entry.spellcheck = true;
+    if (entry.solved || entry.artwork || entry.letters || entry.spellcheck) out[key] = entry;
+  }
+  return out;
+}
+
+const ID_KEY = /^[1-9]\d{0,4}$/;
+
+export function sanitizeDrafts(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object") return {};
+  const { version, drafts } = raw as { version?: unknown; drafts?: unknown };
+  if (version !== SCHEMA_VERSION || !drafts || typeof drafts !== "object") return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(drafts)) {
+    const text = cleanText(value);
+    if (ID_KEY.test(key) && text) out[key] = text;
   }
   return out;
 }
@@ -47,6 +72,7 @@ type Listener = () => void;
 
 export class ProgressStore {
   private map: ProgressMap = {};
+  private drafts: Record<string, string> = {};
   private byId = new Map<number, Set<Listener>>();
   private all = new Set<Listener>();
   // false when localStorage is unavailable or writes fail (private mode, quota)
@@ -59,6 +85,45 @@ export class ProgressStore {
     readonly key = STORAGE_KEY,
   ) {
     this.map = this.read();
+    this.drafts = this.readDrafts();
+  }
+
+  private get draftKey() {
+    return `${this.key}:drafts`;
+  }
+
+  private readDrafts(): Record<string, string> {
+    try {
+      const text = this.storage?.getItem(this.draftKey);
+      return text ? sanitizeDrafts(JSON.parse(text)) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private writeDrafts() {
+    try {
+      this.storage?.setItem(this.draftKey, JSON.stringify({ version: SCHEMA_VERSION, drafts: this.drafts }));
+    } catch {
+      /* drafts are a convenience; progress reports persistence */
+    }
+  }
+
+  // The text left typed in a tile's name box. Only read when a tile mounts,
+  // so saving one never re-renders anything.
+  draft(id: number): string {
+    return this.drafts[id] ?? "";
+  }
+
+  setDraft(id: number, text: string) {
+    const clean = cleanText(text);
+    if ((this.drafts[id] ?? "") === clean) return;
+    if (clean) this.drafts = { ...this.drafts, [id]: clean };
+    else {
+      const { [id]: _, ...rest } = this.drafts;
+      this.drafts = rest;
+    }
+    this.writeDrafts();
   }
 
   private read(): ProgressMap {
@@ -138,6 +203,12 @@ export class ProgressStore {
   // Drops all progress (solve and hints) for these ids; one save and one
   // notification round. Used by the dev tools.
   forgetMany(ids: readonly number[]) {
+    if (ids.some((id) => id in this.drafts)) {
+      const drafts = { ...this.drafts };
+      for (const id of ids) delete drafts[id];
+      this.drafts = drafts;
+      this.writeDrafts();
+    }
     const changed = ids.filter((id) => id in this.map);
     if (changed.length === 0) return;
     const next = { ...this.map };
@@ -153,6 +224,11 @@ export class ProgressStore {
     if (!cur.artwork) this.set(id, { ...cur, artwork: true });
   }
 
+  spellcheck(id: number) {
+    const cur = this.get(id);
+    if (!cur.spellcheck) this.set(id, { ...cur, spellcheck: true });
+  }
+
   revealLetter(id: number, available: number) {
     const cur = this.get(id);
     if (cur.letters < Math.min(available, MAX_LETTERS)) this.set(id, { ...cur, letters: cur.letters + 1 });
@@ -160,10 +236,12 @@ export class ProgressStore {
 
   reset() {
     this.map = {};
+    this.drafts = {};
     this.epoch++;
     if (this.storage) {
       try {
         this.storage.removeItem(this.key);
+        this.storage.removeItem(this.draftKey);
         this.persistent = true;
       } catch {
         this.persistent = false;
@@ -175,6 +253,7 @@ export class ProgressStore {
   // Pick up changes saved by another tab.
   reload() {
     this.map = this.read();
+    this.drafts = this.readDrafts();
     this.notifyAll();
   }
 
